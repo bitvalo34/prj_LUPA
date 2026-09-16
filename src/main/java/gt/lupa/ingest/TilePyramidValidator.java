@@ -4,30 +4,56 @@ import gt.lupa.storage.CatalogException;
 import gt.lupa.storage.CatalogJson;
 import gt.lupa.storage.ImageLevel;
 import gt.lupa.storage.ImageManifest;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 
 public final class TilePyramidValidator {
     public static final long MAX_TILE_BYTES = 262_144L;
     private static final Pattern TILE_NAME = Pattern.compile("^(\\d+)_(\\d+)\\.jpg$");
     private static final Pattern LEVEL_NAME = Pattern.compile("^\\d+$");
+    private static final int DEFAULT_WORKERS = Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors()));
+    private static final int IN_FLIGHT_MULTIPLIER = 4;
 
-    private final ProcessRunner processRunner;
-    private final VipsImageInspector imageInspector;
     private final CatalogJson catalogJson = new CatalogJson();
+    private final int validationWorkers;
 
-    public TilePyramidValidator(ProcessRunner processRunner, VipsImageInspector imageInspector) {
-        this.processRunner = processRunner;
-        this.imageInspector = imageInspector;
+    public TilePyramidValidator() {
+        this(DEFAULT_WORKERS);
+    }
+
+    /**
+     * Kept for source compatibility with the A19 wiring. Per-tile validation no longer launches
+     * libvips processes; tiles are small (<= 256x256) and are decoded safely inside the JVM.
+     */
+    public TilePyramidValidator(ProcessRunner ignoredProcessRunner, VipsImageInspector ignoredImageInspector) {
+        this(DEFAULT_WORKERS);
+    }
+
+    TilePyramidValidator(int validationWorkers) {
+        if (validationWorkers < 1 || validationWorkers > 8) {
+            throw new IllegalArgumentException("validationWorkers must be between 1 and 8");
+        }
+        this.validationWorkers = validationWorkers;
     }
 
     public PyramidValidationReport validate(IngestCliConfig config, StagingResult staging)
@@ -45,27 +71,60 @@ public final class TilePyramidValidator {
         long tileCount = 0L;
         long jpegBytes = 0L;
 
-        for (ImageLevel level : manifest.levels()) {
-            int columns = PyramidMath.ceilDivide(level.width(), manifest.tileSize());
-            int rows = PyramidMath.ceilDivide(level.height(), manifest.tileSize());
-            if (level.z() == 0 && (columns != 1 || rows != 1)) {
-                throw new IngestException(3, "level 0 must contain exactly one tile");
-            }
+        ExecutorService executor = Executors.newFixedThreadPool(validationWorkers, runnable -> {
+            Thread thread = new Thread(runnable, "lupa-tile-validator");
+            thread.setDaemon(true);
+            return thread;
+        });
+        ArrayDeque<Future<TileValidationResult>> inFlight = new ArrayDeque<>();
+        int maxInFlight = Math.multiplyExact(validationWorkers, IN_FLIGHT_MULTIPLIER);
 
-            Path levelDir = tilesRoot.resolve(Integer.toString(level.z()));
-            validateLevelFileSet(levelDir, columns, rows, level.z());
+        try {
+            for (ImageLevel level : manifest.levels()) {
+                int columns = PyramidMath.ceilDivide(level.width(), manifest.tileSize());
+                int rows = PyramidMath.ceilDivide(level.height(), manifest.tileSize());
+                if (level.z() == 0 && (columns != 1 || rows != 1)) {
+                    throw new IngestException(3, "level 0 must contain exactly one tile");
+                }
 
-            for (int y = 0; y < rows; y++) {
-                for (int x = 0; x < columns; x++) {
-                    Path tile = levelDir.resolve(x + "_" + y + ".jpg");
-                    long bytes = validateTile(config, tile, level, x, y);
-                    try {
-                        tileCount = Math.addExact(tileCount, 1L);
-                        jpegBytes = Math.addExact(jpegBytes, bytes);
-                    } catch (ArithmeticException e) {
-                        throw new IngestException(3, "tile counters overflowed", e);
+                Path levelDir = tilesRoot.resolve(Integer.toString(level.z()));
+                validateLevelFileSet(levelDir, columns, rows, level.z());
+
+                for (int y = 0; y < rows; y++) {
+                    for (int x = 0; x < columns; x++) {
+                        final int tileX = x;
+                        final int tileY = y;
+                        Path tile = levelDir.resolve(tileX + "_" + tileY + ".jpg");
+                        inFlight.addLast(executor.submit(() -> validateTile(tile, level, tileX, tileY)));
+
+                        if (inFlight.size() >= maxInFlight) {
+                            TileValidationResult completed = await(inFlight.removeFirst());
+                            tileCount = Math.addExact(tileCount, 1L);
+                            jpegBytes = Math.addExact(jpegBytes, completed.bytes());
+                        }
                     }
                 }
+            }
+
+            while (!inFlight.isEmpty()) {
+                TileValidationResult completed = await(inFlight.removeFirst());
+                tileCount = Math.addExact(tileCount, 1L);
+                jpegBytes = Math.addExact(jpegBytes, completed.bytes());
+            }
+        } catch (ArithmeticException e) {
+            cancelOutstanding(inFlight);
+            throw new IngestException(3, "tile counters overflowed", e);
+        } catch (IngestException e) {
+            cancelOutstanding(inFlight);
+            throw e;
+        } finally {
+            executor.shutdownNow();
+            try {
+                if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    System.err.println("A19 warning: tile validation workers did not stop within 5 seconds");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }
 
@@ -164,7 +223,7 @@ public final class TilePyramidValidator {
         }
     }
 
-    private long validateTile(IngestCliConfig config, Path tile, ImageLevel level, int x, int y)
+    private static TileValidationResult validateTile(Path tile, ImageLevel level, int x, int y)
             throws IngestException {
         if (!Files.isRegularFile(tile, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(tile)) {
             throw new IngestException(3, "missing tile: " + tile);
@@ -181,39 +240,59 @@ public final class TilePyramidValidator {
         }
         verifyJpegSignature(tile);
 
-        VipsRasterInfo raster = imageInspector.inspectRaster(
-                config.vipsHeaderExecutable(),
-                tile.toString(),
-                perTileTimeout(config),
-                config.dataRoot()
-        );
         int expectedWidth = Math.min(PyramidMath.TILE_SIZE, level.width() - x * PyramidMath.TILE_SIZE);
         int expectedHeight = Math.min(PyramidMath.TILE_SIZE, level.height() - y * PyramidMath.TILE_SIZE);
-        if (raster.width() != expectedWidth || raster.height() != expectedHeight) {
-            throw new IngestException(
-                    3,
-                    "tile dimensions are incorrect for " + tile + "; expected "
-                            + expectedWidth + "x" + expectedHeight + " but got "
-                            + raster.width() + "x" + raster.height()
-            );
-        }
-        if (raster.bands() != 3) {
-            throw new IngestException(3, "published JPEG tile must have 3 bands: " + tile);
-        }
+        decodeAndValidateJpeg(tile, expectedWidth, expectedHeight);
 
-        ProcessResult decode = processRunner.run(
-                VipsRuntime.command(config, "avg", tile.toString()),
-                perTileTimeout(config),
-                config.dataRoot()
-        );
-        if (decode.timedOut()) {
-            throw new IngestException(3, "tile decode timed out: " + tile);
+        return new TileValidationResult(bytes);
+    }
+
+    private static void decodeAndValidateJpeg(Path tile, int expectedWidth, int expectedHeight)
+            throws IngestException {
+        try (ImageInputStream input = ImageIO.createImageInputStream(tile.toFile())) {
+            if (input == null) {
+                throw new IngestException(3, "cannot open tile as an image: " + tile);
+            }
+
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) {
+                throw new IngestException(3, "tile has no available image decoder: " + tile);
+            }
+
+            ImageReader reader = readers.next();
+            try {
+                String format = reader.getFormatName().toLowerCase(Locale.ROOT);
+                if (!format.equals("jpeg") && !format.equals("jpg")) {
+                    throw new IngestException(3, "tile is not decoded as JPEG: " + tile + " format=" + format);
+                }
+
+                reader.setInput(input, true, true);
+                int actualWidth = reader.getWidth(0);
+                int actualHeight = reader.getHeight(0);
+                if (actualWidth != expectedWidth || actualHeight != expectedHeight) {
+                    throw new IngestException(
+                            3,
+                            "tile dimensions are incorrect for " + tile + "; expected "
+                                    + expectedWidth + "x" + expectedHeight + " but got "
+                                    + actualWidth + "x" + actualHeight
+                    );
+                }
+
+                BufferedImage decoded = reader.read(0);
+                if (decoded == null) {
+                    throw new IngestException(3, "tile JPEG decoder returned no image: " + tile);
+                }
+                if (decoded.getRaster().getNumBands() != 3) {
+                    throw new IngestException(3, "published JPEG tile must decode to 3 bands: " + tile);
+                }
+            } finally {
+                reader.dispose();
+            }
+        } catch (IngestException e) {
+            throw e;
+        } catch (IOException | RuntimeException e) {
+            throw new IngestException(3, "tile is not fully decodable as JPEG: " + tile, e);
         }
-        if (decode.exitCode() != 0) {
-            String detail = !decode.stderr().isBlank() ? decode.stderr().strip() : decode.stdout().strip();
-            throw new IngestException(3, "tile is not fully decodable by libvips: " + tile + " " + detail);
-        }
-        return bytes;
     }
 
     private static void verifyJpegSignature(Path tile) throws IngestException {
@@ -228,10 +307,30 @@ public final class TilePyramidValidator {
         }
     }
 
-    private static Duration perTileTimeout(IngestCliConfig config) {
-        long seconds = Math.max(1L, Math.min(30L, config.processTimeout().toSeconds()));
-        return Duration.ofSeconds(seconds);
+    private static TileValidationResult await(Future<TileValidationResult> future) throws IngestException {
+        try {
+            return future.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IngestException(3, "tile validation interrupted", e);
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof IngestException ingestException) {
+                throw ingestException;
+            }
+            throw new IngestException(3, "unexpected tile validation failure", cause);
+        }
     }
+
+    private static void cancelOutstanding(ArrayDeque<Future<TileValidationResult>> futures) {
+        for (Future<TileValidationResult> future : futures) {
+            future.cancel(true);
+        }
+        futures.clear();
+    }
+}
+
+record TileValidationResult(long bytes) {
 }
 
 record PyramidValidationReport(
