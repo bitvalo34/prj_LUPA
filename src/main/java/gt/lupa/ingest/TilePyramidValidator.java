@@ -41,10 +41,6 @@ public final class TilePyramidValidator {
         this(DEFAULT_WORKERS);
     }
 
-    /**
-     * Kept for source compatibility with the A19 wiring. Per-tile validation no longer launches
-     * libvips processes; tiles are small (<= 256x256) and are decoded safely inside the JVM.
-     */
     public TilePyramidValidator(ProcessRunner ignoredProcessRunner, VipsImageInspector ignoredImageInspector) {
         this(DEFAULT_WORKERS);
     }
@@ -68,8 +64,10 @@ public final class TilePyramidValidator {
         }
 
         validateLevelDirectorySet(tilesRoot, manifest.levels().size());
+        long totalExpected = totalExpectedTiles(manifest);
         long tileCount = 0L;
         long jpegBytes = 0L;
+        ProgressPrinter progress = new ProgressPrinter(totalExpected);
 
         ExecutorService executor = Executors.newFixedThreadPool(validationWorkers, runnable -> {
             Thread thread = new Thread(runnable, "lupa-tile-validator");
@@ -101,6 +99,7 @@ public final class TilePyramidValidator {
                             TileValidationResult completed = await(inFlight.removeFirst());
                             tileCount = Math.addExact(tileCount, 1L);
                             jpegBytes = Math.addExact(jpegBytes, completed.bytes());
+                            progress.maybePrint(tileCount);
                         }
                     }
                 }
@@ -110,6 +109,7 @@ public final class TilePyramidValidator {
                 TileValidationResult completed = await(inFlight.removeFirst());
                 tileCount = Math.addExact(tileCount, 1L);
                 jpegBytes = Math.addExact(jpegBytes, completed.bytes());
+                progress.maybePrint(tileCount);
             }
         } catch (ArithmeticException e) {
             cancelOutstanding(inFlight);
@@ -128,6 +128,7 @@ public final class TilePyramidValidator {
             }
         }
 
+        progress.finish(tileCount);
         return new PyramidValidationReport(manifest, tileCount, jpegBytes);
     }
 
@@ -155,6 +156,20 @@ public final class TilePyramidValidator {
                 || manifest.levels().size() != staging.levelCount()
                 || manifest.levels().size() - 1 != staging.maxLevel()) {
             throw new IngestException(3, "manifest dimensions or levels do not match the staged import");
+        }
+    }
+
+    private static long totalExpectedTiles(ImageManifest manifest) throws IngestException {
+        long total = 0L;
+        try {
+            for (ImageLevel level : manifest.levels()) {
+                long columns = PyramidMath.ceilDivide(level.width(), manifest.tileSize());
+                long rows = PyramidMath.ceilDivide(level.height(), manifest.tileSize());
+                total = Math.addExact(total, Math.multiplyExact(columns, rows));
+            }
+            return total;
+        } catch (ArithmeticException e) {
+            throw new IngestException(3, "expected tile count overflowed", e);
         }
     }
 
@@ -327,6 +342,36 @@ public final class TilePyramidValidator {
             future.cancel(true);
         }
         futures.clear();
+    }
+
+    private static final class ProgressPrinter {
+        private final long total;
+        private long nextPercent = 10L;
+
+        private ProgressPrinter(long total) {
+            this.total = total;
+            System.out.printf("[A19] validating tiles 0 / %d (0.0%%)%n", total);
+        }
+
+        private void maybePrint(long completed) {
+            if (total <= 0L) {
+                return;
+            }
+            long percent = completed * 100L / total;
+            if (percent >= nextPercent || completed == total) {
+                System.out.printf("[A19] validating tiles %d / %d (%.1f%%)%n",
+                        completed, total, completed * 100.0 / total);
+                while (nextPercent <= percent) {
+                    nextPercent += 10L;
+                }
+            }
+        }
+
+        private void finish(long completed) {
+            if (completed == total && total > 0L) {
+                System.out.printf("[A19] validation complete: %d tiles%n", completed);
+            }
+        }
     }
 }
 
