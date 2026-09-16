@@ -49,13 +49,26 @@ public final class PublicationService {
 
             String sourceHashBefore = sha256(config.original());
             long sourceBytes = Files.size(config.original());
-            String extension = inspection.actualFormat() == ActualFormat.JPEG ? ".jpg" : ".tiff";
-            Path copiedOriginal = originalDir.resolve("source" + extension);
-            copyOriginalAtomically(config.original(), copiedOriginal);
-            String copiedHash = sha256(copiedOriginal);
-            String sourceHashAfter = sha256(config.original());
-            if (!sourceHashBefore.equals(sourceHashAfter) || !sourceHashBefore.equals(copiedHash)) {
-                throw new IngestException(4, "original hash changed or copied original does not match the source");
+            Path preservedOriginal;
+
+            if (config.originalPolicy() == OriginalPolicy.COPY) {
+                System.out.println("[A19] copying private original...");
+                String extension = inspection.actualFormat() == ActualFormat.JPEG ? ".jpg" : ".tiff";
+                Path copiedOriginal = originalDir.resolve("source" + extension);
+                copyOriginalAtomically(config.original(), copiedOriginal);
+                String copiedHash = sha256(copiedOriginal);
+                String sourceHashAfter = sha256(config.original());
+                if (!sourceHashBefore.equals(sourceHashAfter) || !sourceHashBefore.equals(copiedHash)) {
+                    throw new IngestException(4, "original hash changed or copied original does not match the source");
+                }
+                preservedOriginal = copiedOriginal;
+            } else {
+                System.out.println("[A19] preserving original by private reference (no duplicate copy)...");
+                String sourceHashAfter = sha256(config.original());
+                if (!sourceHashBefore.equals(sourceHashAfter)) {
+                    throw new IngestException(4, "original changed while reference metadata was being prepared");
+                }
+                preservedOriginal = config.original();
             }
 
             writePrivateMetadata(
@@ -65,9 +78,11 @@ public final class PublicationService {
                     preflight,
                     validation,
                     sourceHashBefore,
-                    sourceBytes
+                    sourceBytes,
+                    preservedOriginal
             );
 
+            System.out.println("[A19] publishing immutable pyramid version...");
             Files.createDirectories(publishedDir.getParent());
             moveVersionAtomically(staging.stagedVersionPath(), publishedDir);
             versionMoved = true;
@@ -82,6 +97,7 @@ public final class PublicationService {
                     manifest.levels().size() - 1
             );
             try {
+                System.out.println("[A19] updating catalog atomically...");
                 catalogPublisher.publish(layout.catalog(), image);
             } catch (CatalogException e) {
                 cleanupJobBestEffort(staging.jobDirectory(), e);
@@ -100,7 +116,8 @@ public final class PublicationService {
                     staging.imageVersion(),
                     publishedDir,
                     layout.catalog(),
-                    copiedOriginal,
+                    preservedOriginal,
+                    config.originalPolicy(),
                     sourceHashBefore,
                     sourceBytes,
                     validation.tileCount(),
@@ -149,7 +166,8 @@ public final class PublicationService {
             PreflightReport preflight,
             PyramidValidationReport validation,
             String originalSha256,
-            long originalBytes) throws IngestException {
+            long originalBytes,
+            Path preservedOriginal) throws IngestException {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("schemaVersion", 1);
         root.put("displayName", config.displayName());
@@ -158,6 +176,8 @@ public final class PublicationService {
         root.put("sourceFormat", inspection.actualFormat().name());
         root.put("sourceSha256", originalSha256);
         root.put("sourceBytes", originalBytes);
+        root.put("originalPolicy", config.originalPolicy().cliValue());
+        root.put("privateOriginalPath", preservedOriginal.toAbsolutePath().normalize().toString());
         root.put("importedAtUtc", Instant.now().toString());
         root.put("libvipsVersion", preflight.vipsVersion());
         root.put("normalizedWidth", validation.manifest().width());
@@ -265,6 +285,7 @@ record PublicationResult(
         Path publishedVersionPath,
         Path catalogPath,
         Path privateOriginalPath,
+        OriginalPolicy originalPolicy,
         String originalSha256,
         long originalBytes,
         long tileCount,
