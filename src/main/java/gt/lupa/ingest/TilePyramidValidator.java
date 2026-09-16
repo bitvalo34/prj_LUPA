@@ -12,7 +12,6 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -203,7 +202,7 @@ public final class TilePyramidValidator {
         }
 
         ProcessResult decode = processRunner.run(
-                List.of(config.vipsExecutable(), "avg", tile.toString()),
+                VipsRuntime.command(config, "avg", tile.toString()),
                 perTileTimeout(config),
                 config.dataRoot()
         );
