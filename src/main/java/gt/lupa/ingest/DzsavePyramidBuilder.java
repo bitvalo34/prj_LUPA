@@ -1,13 +1,15 @@
 package gt.lupa.ingest;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.lupa.storage.CatalogException;
+import gt.lupa.storage.CatalogJson;
+import gt.lupa.storage.ImageLevel;
+import gt.lupa.storage.ImageManifest;
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -18,7 +20,7 @@ import java.util.stream.Stream;
 public final class DzsavePyramidBuilder {
     private static final Pattern TILE_NAME = Pattern.compile("^(\\d+)_(\\d+)\\.jpg$");
     private final ProcessRunner processRunner;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final CatalogJson catalogJson = new CatalogJson();
 
     public DzsavePyramidBuilder(ProcessRunner processRunner) {
         this.processRunner = processRunner;
@@ -96,6 +98,7 @@ public final class DzsavePyramidBuilder {
         return new StagingResult(
                 jobDirectory,
                 stagedVersionPath,
+                imageId,
                 imageVersion,
                 plan.width(),
                 plan.height(),
@@ -180,29 +183,27 @@ public final class DzsavePyramidBuilder {
 
     private void writeManifest(Path manifestPath, String imageId, String imageVersion, PyramidPlan plan)
             throws IngestException {
-        ObjectNode root = objectMapper.createObjectNode();
-        root.put("schemaVersion", 1);
-        root.put("imageId", imageId);
-        root.put("imageVersion", imageVersion);
-        root.put("width", plan.width());
-        root.put("height", plan.height());
-        root.put("tileSize", PyramidMath.TILE_SIZE);
-        root.put("overlap", 0);
-        root.put("depth", "onetile");
-
-        ArrayNode levels = root.putArray("levels");
-        for (PyramidLevel level : plan.levels()) {
-            ObjectNode levelNode = levels.addObject();
-            levelNode.put("z", level.z());
-            levelNode.put("width", level.width());
-            levelNode.put("height", level.height());
-            levelNode.put("columns", level.columns());
-            levelNode.put("rows", level.rows());
-        }
+        List<ImageLevel> levels = plan.levels().stream()
+                .map(level -> new ImageLevel(level.z(), level.width(), level.height()))
+                .toList();
+        ImageManifest manifest = new ImageManifest(
+                1,
+                imageId,
+                imageVersion,
+                plan.width(),
+                plan.height(),
+                PyramidMath.TILE_SIZE,
+                0,
+                "onetile",
+                levels
+        );
 
         try {
+            byte[] bytes = catalogJson.writeManifest(manifest);
             Files.createDirectories(manifestPath.getParent());
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(manifestPath.toFile(), root);
+            Files.write(manifestPath, bytes, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+        } catch (CatalogException e) {
+            throw new IngestException(3, "generated manifest does not satisfy the S19 contract", e);
         } catch (IOException e) {
             throw new IngestException(4, "cannot write manifest.json", e);
         }

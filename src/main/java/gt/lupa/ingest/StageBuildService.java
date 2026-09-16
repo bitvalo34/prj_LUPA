@@ -34,36 +34,40 @@ public final class StageBuildService {
         StorageLayout layout = new StorageLayout(config.dataRoot());
 
         try (ImportLock ignored = ImportLock.acquire(layout)) {
-            String imageVersion = VersionPlanner.nextVersion(layout, config.imageId());
-            Path jobDirectory = layout.createJobDirectory();
+            return stagePrepared(config, inspection, layout);
+        }
+    }
 
+    StagingResult stagePrepared(IngestCliConfig config, ImageInspection inspection, StorageLayout layout)
+            throws IngestException {
+        String imageVersion = VersionPlanner.nextVersion(layout, config.imageId());
+        Path jobDirectory = layout.createJobDirectory();
+
+        try {
+            NormalizedImage normalizedImage = normalizedImageBuilder.build(config, inspection, jobDirectory);
+            PyramidPlan plan = PyramidMath.plan(normalizedImage.width(), normalizedImage.height());
+            return dzsavePyramidBuilder.build(
+                    config,
+                    config.imageId(),
+                    imageVersion,
+                    jobDirectory,
+                    normalizedImage,
+                    plan
+            );
+        } catch (IngestException e) {
             try {
-                NormalizedImage normalizedImage = normalizedImageBuilder.build(config, inspection, jobDirectory);
-                PyramidPlan plan = PyramidMath.plan(normalizedImage.width(), normalizedImage.height());
-
-                return dzsavePyramidBuilder.build(
-                        config,
-                        config.imageId(),
-                        imageVersion,
-                        jobDirectory,
-                        normalizedImage,
-                        plan
-                );
-            } catch (IngestException e) {
-                try {
-                    FileTreeCleaner.deleteRecursively(jobDirectory);
-                } catch (IngestException cleanup) {
-                    e.addSuppressed(cleanup);
-                }
-                throw e;
-            } catch (RuntimeException e) {
-                try {
-                    FileTreeCleaner.deleteRecursively(jobDirectory);
-                } catch (IngestException cleanup) {
-                    e.addSuppressed(cleanup);
-                }
-                throw new IngestException(1, "unexpected runtime failure during staging", e);
+                FileTreeCleaner.deleteRecursively(jobDirectory);
+            } catch (IngestException cleanup) {
+                e.addSuppressed(cleanup);
             }
+            throw e;
+        } catch (RuntimeException e) {
+            try {
+                FileTreeCleaner.deleteRecursively(jobDirectory);
+            } catch (IngestException cleanup) {
+                e.addSuppressed(cleanup);
+            }
+            throw new IngestException(1, "unexpected runtime failure during staging", e);
         }
     }
 }
@@ -71,6 +75,7 @@ public final class StageBuildService {
 record StagingResult(
         Path jobDirectory,
         Path stagedVersionPath,
+        String imageId,
         String imageVersion,
         int width,
         int height,
@@ -79,7 +84,8 @@ record StagingResult(
 }
 
 final class VersionPlanner {
-    private static final Pattern VERSION = Pattern.compile("^v([1-9]\\d*)$");
+    private static final Pattern VERSION = Pattern.compile("^v([1-9]\\d{0,9})$");
+    private static final long MAX_VERSION_NUMBER = 9_999_999_999L;
 
     private VersionPlanner() {
     }
@@ -90,30 +96,35 @@ final class VersionPlanner {
         } catch (CatalogException e) {
             throw new IngestException(2, e.getMessage(), e);
         }
-
         layout.initialize();
-        Path imageRoot = layout.pyramids().resolve(imageId);
-        if (!Files.isDirectory(imageRoot)) {
-            return "v1";
+        long max = Math.max(
+                maxVersionUnder(layout.pyramids().resolve(imageId)),
+                maxVersionUnder(layout.originals().resolve(imageId))
+        );
+        if (max >= MAX_VERSION_NUMBER) {
+            throw new IngestException(4, "no further imageVersion can be allocated for " + imageId);
         }
+        return "v" + (max + 1L);
+    }
 
-        int max = 0;
+    private static long maxVersionUnder(Path imageRoot) throws IngestException {
+        if (!Files.isDirectory(imageRoot)) {
+            return 0L;
+        }
+        long max = 0L;
         try (Stream<Path> stream = Files.list(imageRoot)) {
             for (Path child : stream.filter(Files::isDirectory).toList()) {
                 Matcher matcher = VERSION.matcher(child.getFileName().toString());
                 if (!matcher.matches()) {
                     continue;
                 }
-                int numeric = Integer.parseInt(matcher.group(1));
-                if (numeric > max) {
-                    max = numeric;
-                }
+                long numeric = Long.parseLong(matcher.group(1));
+                max = Math.max(max, numeric);
             }
-        } catch (IOException e) {
-            throw new IngestException(4, "cannot inspect published versions for imageId " + imageId, e);
+            return max;
+        } catch (IOException | NumberFormatException e) {
+            throw new IngestException(4, "cannot inspect existing versions under " + imageRoot, e);
         }
-
-        return "v" + (max + 1);
     }
 }
 
