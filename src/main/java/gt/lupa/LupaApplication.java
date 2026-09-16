@@ -23,7 +23,12 @@ public final class LupaApplication {
         NioHttpServer server = new NioHttpServer(config, router);
         server.start();
         Runtime.getRuntime().addShutdownHook(new Thread(server::close, "lupa-shutdown"));
-        System.out.printf("LUPA E19 listening on http://%s:%d/ (catalog=%s)%n", config.host(), server.port(), config.catalogMode());
+        System.out.printf(
+                "LUPA I19 listening on http://%s:%d/ (catalog=%s, dataRoot=%s)%n",
+                config.host(),
+                server.port(),
+                config.catalogMode(),
+                config.dataRoot());
         new CountDownLatch(1).await();
     }
 }

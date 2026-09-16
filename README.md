@@ -2,34 +2,47 @@
 
 LUPA (Lectura Ultraresolutiva Progresiva y Adaptativa) — servidor asíncrono académico en Java 21.
 
-## E19: base HTTP
+## Base integrada S19 + E19 + A19 + I19
 
-La rama `feature/e19-http` contiene la base HTTP/1.1 acotada implementada con Java NIO.2.
-
-Requisitos de desarrollo:
+Requisitos de desarrollo comprobados:
 
 - JDK 21
 - Maven 3.9.x
+- libvips 8.15.x para importación
 
 Compilar y probar:
 
 ```bash
-mvn clean verify
+mvn clean verify package
 ```
 
-Generar paquete ejecutable:
+La ejecución normal del servidor usa el catálogo real publicado por A19. En el equipo de desarrollo:
 
 ```bash
-mvn package
-java -jar target/lupa.jar --host=127.0.0.1 --port=8080 --catalog=fixture
+java -jar target/lupa.jar \
+  --host=127.0.0.1 \
+  --port=8081 \
+  --data-root=/home/erwin/PRJIMA/data
 ```
 
-Abrir `http://127.0.0.1:8080/`.
-
-Para usar el catálogo real de A19/I19:
+Consultar catálogo:
 
 ```bash
-java -jar target/lupa.jar --catalog=file --catalog-path=data/catalog.json
+curl -i http://127.0.0.1:8081/api/catalog
+curl -I http://127.0.0.1:8081/api/catalog
 ```
 
-Consulta `docs/E19.md` para configuración, pruebas, preparación offline e integración.
+La fixture de E19 permanece únicamente como modo explícito de prueba:
+
+```bash
+java -jar target/lupa.jar --catalog=fixture --port=8081
+```
+
+Para importar una imagen se usa `gt.lupa.ingest.IngestApplication` con el mismo `--data-root` que el servidor.
+
+Documentación:
+
+- `docs/contrato-v1.md` — contrato S19.
+- `docs/E19.md` — base HTTP.
+- `docs/A19.md` y `docs/A19_FINAL_VALIDATION.md` — importador/publicación.
+- `docs/I19.md` — integración del catálogo real, comandos y revisión.
