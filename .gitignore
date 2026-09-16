@@ -18,6 +18,13 @@ data/catalog.json
 logs/
 *.log
 
+# Local A19 validation samples (not source artifacts)
+/prueba*.jpg
+/prueba*.jpeg
+/prueba*.tif
+/prueba*.tiff
+*:Zone.Identifier
+
 # OS/editor noise
 .DS_Store
 *~
