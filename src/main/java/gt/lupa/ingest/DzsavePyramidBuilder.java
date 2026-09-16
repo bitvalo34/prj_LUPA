@@ -52,8 +52,8 @@ public final class DzsavePyramidBuilder {
         }
 
         ProcessResult result = processRunner.run(
-                List.of(
-                        config.vipsExecutable(),
+                VipsRuntime.command(
+                        config,
                         "dzsave",
                         normalizedImage.file().toString(),
                         dzBase.toString(),
