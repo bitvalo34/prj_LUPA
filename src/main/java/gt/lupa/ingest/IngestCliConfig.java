@@ -19,6 +19,20 @@ public record IngestCliConfig(
         int jpegQuality,
         OriginalPolicy originalPolicy) {
 
+    public IngestCliConfig(
+            Path original,
+            String imageId,
+            String displayName,
+            String licenseRef,
+            Path dataRoot,
+            String vipsExecutable,
+            String vipsHeaderExecutable,
+            Duration processTimeout,
+            int jpegQuality) {
+        this(original, imageId, displayName, licenseRef, dataRoot, vipsExecutable, vipsHeaderExecutable,
+                processTimeout, jpegQuality, OriginalPolicy.COPY);
+    }
+
     public static IngestCliConfig parse(String[] args) throws IngestException {
         Map<String, String> values = new HashMap<>();
         for (String arg : args) {
