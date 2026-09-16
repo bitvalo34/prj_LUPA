@@ -1,0 +1,46 @@
+name: E19 CI
+
+on:
+  push:
+    branches: ["feature/e19-http"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Versions
+        run: |
+          java -version
+          mvn -version
+      - name: Online clean verify and package
+        run: mvn -B clean verify package
+      - name: Offline clean verify and package
+        run: mvn -B -o clean verify package
+      - name: Start packaged server
+        run: |
+          java -jar target/lupa.jar --host=127.0.0.1 --port=18080 --catalog=fixture > /tmp/lupa.log 2>&1 &
+          echo $! > /tmp/lupa.pid
+          for i in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:18080/ >/tmp/root.html; then break; fi
+            sleep 0.25
+          done
+          curl --fail --silent http://127.0.0.1:18080/assets/app.css >/tmp/app.css
+          curl --fail --silent http://127.0.0.1:18080/assets/app.js >/tmp/app.js
+          curl --fail --silent http://127.0.0.1:18080/api/catalog >/tmp/catalog.json
+          grep -q 'Servidor HTTP asíncrono E19 activo' /tmp/root.html
+          grep -q '"schemaVersion":1' /tmp/catalog.json
+          ! grep -RE 'https?://' src/main/resources/web
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/lupa.pid ]; then kill "$(cat /tmp/lupa.pid)" 2>/dev/null || true; fi
+          cat /tmp/lupa.log 2>/dev/null || true
