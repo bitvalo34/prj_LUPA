@@ -1,0 +1,23 @@
+# Maven / Java
+/target/
+*.class
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Offline dependency cache prepared locally
+/.m2-offline/
+
+# Runtime data and logs
+data/originals/
+data/staging/
+data/pyramids/
+data/catalog.json
+logs/
+*.log
+
+# OS/editor noise
+.DS_Store
+*~

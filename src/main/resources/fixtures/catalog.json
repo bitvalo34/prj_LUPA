@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "images": [
+    {
+      "imageId": "lupa-small",
+      "imageVersion": "v1",
+      "width": 4096,
+      "height": 3072,
+      "tileSize": 256,
+      "maxLevel": 4
+    }
+  ]
+}
