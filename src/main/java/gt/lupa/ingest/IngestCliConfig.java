@@ -16,7 +16,22 @@ public record IngestCliConfig(
         String vipsExecutable,
         String vipsHeaderExecutable,
         Duration processTimeout,
-        int jpegQuality) {
+        int jpegQuality,
+        OriginalPolicy originalPolicy) {
+
+    public IngestCliConfig(
+            Path original,
+            String imageId,
+            String displayName,
+            String licenseRef,
+            Path dataRoot,
+            String vipsExecutable,
+            String vipsHeaderExecutable,
+            Duration processTimeout,
+            int jpegQuality) {
+        this(original, imageId, displayName, licenseRef, dataRoot, vipsExecutable, vipsHeaderExecutable,
+                processTimeout, jpegQuality, OriginalPolicy.COPY);
+    }
 
     public static IngestCliConfig parse(String[] args) throws IngestException {
         Map<String, String> values = new HashMap<>();
@@ -53,6 +68,7 @@ public record IngestCliConfig(
         String vipsHeader = values.getOrDefault("vipsheader", "vipsheader");
         long timeoutSeconds = parseLong(values.getOrDefault("timeout-seconds", "600"), "timeout-seconds", 1, 7200);
         int quality = (int) parseLong(values.getOrDefault("jpeg-quality", "85"), "jpeg-quality", 40, 95);
+        OriginalPolicy originalPolicy = OriginalPolicy.parse(values.getOrDefault("original-policy", "copy"));
         return new IngestCliConfig(
                 original,
                 imageId,
@@ -62,14 +78,15 @@ public record IngestCliConfig(
                 vips,
                 vipsHeader,
                 Duration.ofSeconds(timeoutSeconds),
-                quality);
+                quality,
+                originalPolicy);
     }
 
     private static void rejectUnknown(Map<String, String> values) throws IngestException {
         for (String key : values.keySet()) {
             if (!switch (key) {
                 case "original", "image-id", "display-name", "license-ref", "data-root",
-                     "vips", "vipsheader", "timeout-seconds", "jpeg-quality" -> true;
+                     "vips", "vipsheader", "timeout-seconds", "jpeg-quality", "original-policy" -> true;
                 default -> false;
             }) {
                 throw new IngestException(2, "unknown argument: --" + key);

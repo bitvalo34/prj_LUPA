@@ -37,20 +37,33 @@ public final class IngestApplication {
     private static int runPreflight(String[] optionArgs) {
         try {
             IngestCliConfig config = IngestCliConfig.parse(optionArgs);
-            PreflightService service = new PreflightService(new ProcessRunner(64 * 1024));
+            ProcessRunner runner = new ProcessRunner(64 * 1024);
+            PreflightService service = new PreflightService(runner);
+            VipsImageInspector inspector = new VipsImageInspector(runner);
             PreflightReport report = service.check(config);
+            ImageInspection inspection = inspector.inspect(config);
+            SpaceEstimate estimate = SpaceEstimator.estimate(
+                    report.originalBytes(),
+                    inspection.sourceWidth(),
+                    inspection.sourceHeight(),
+                    config.originalPolicy()
+            );
 
             System.out.println("LUPA A19 preflight OK");
             System.out.println("original=" + report.original());
             System.out.println("originalBytes=" + report.originalBytes());
             System.out.println("formatExtension=" + report.extension());
+            System.out.println("dimensions=" + inspection.sourceWidth() + "x" + inspection.sourceHeight());
             System.out.println("dataRoot=" + report.dataRoot());
             System.out.println("usableBytes=" + report.usableBytes());
+            System.out.println("estimatedRequiredBytes=" + estimate.requiredBytes());
+            System.out.println("originalPolicy=" + config.originalPolicy().cliValue());
+            System.out.println("preflightSpace=" + (report.usableBytes() >= estimate.requiredBytes() ? "OK" : "INSUFFICIENT"));
             System.out.println("libvips=" + report.vipsVersion());
             if (report.vipsOutputTruncated()) {
                 System.out.println("warning=libvips version output was truncated");
             }
-            return 0;
+            return report.usableBytes() >= estimate.requiredBytes() ? 0 : 4;
         } catch (IngestException e) {
             System.err.println("A19 error: " + e.getMessage());
             return e.exitCode();
@@ -105,7 +118,7 @@ public final class IngestApplication {
                     preflight,
                     inspector,
                     stage,
-                    new TilePyramidValidator(runner, inspector),
+                    new TilePyramidValidator(),
                     new PublicationService(new CatalogPublisher())
             );
             PublicationResult result = service.importAndPublish(config);
@@ -115,6 +128,7 @@ public final class IngestApplication {
             System.out.println("imageVersion=" + result.imageVersion());
             System.out.println("publishedVersionPath=" + result.publishedVersionPath());
             System.out.println("catalog=" + result.catalogPath());
+            System.out.println("originalPolicy=" + result.originalPolicy().cliValue());
             System.out.println("privateOriginal=" + result.privateOriginalPath());
             System.out.println("originalSha256=" + result.originalSha256());
             System.out.println("originalBytes=" + result.originalBytes());
@@ -146,5 +160,6 @@ public final class IngestApplication {
         System.err.println("  import --original=/path/file.jpg --image-id=sample-photo --display-name=SamplePhoto --license-ref=OwnPhoto");
         System.err.println("Optional:");
         System.err.println("  --data-root=data --vips=vips --vipsheader=vipsheader --timeout-seconds=600 --jpeg-quality=85");
+        System.err.println("  --original-policy=copy|reference (default: copy)");
     }
 }

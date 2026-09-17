@@ -44,8 +44,12 @@ public final class StageBuildService {
         Path jobDirectory = layout.createJobDirectory();
 
         try {
+            System.out.println("[A19] normalizing image...");
             NormalizedImage normalizedImage = normalizedImageBuilder.build(config, inspection, jobDirectory);
             PyramidPlan plan = PyramidMath.plan(normalizedImage.width(), normalizedImage.height());
+            System.out.println("[A19] generating pyramid: levels=" + plan.levels().size()
+                    + " maxLevel=" + plan.maxLevel()
+                    + " normalized=" + plan.width() + "x" + plan.height());
             return dzsavePyramidBuilder.build(
                     config,
                     config.imageId(),
