@@ -20,6 +20,30 @@ class IngestCliConfigTest {
         assertEquals(85, config.jpegQuality());
         assertEquals(600, config.processTimeout().toSeconds());
         assertEquals("vips", config.vipsExecutable());
+        assertEquals(OriginalPolicy.COPY, config.originalPolicy());
+    }
+
+    @Test
+    void parsesReferenceOriginalPolicy() throws Exception {
+        IngestCliConfig config = IngestCliConfig.parse(new String[] {
+                "--original=/tmp/photo.tif",
+                "--image-id=photo-02",
+                "--display-name=Photo 02",
+                "--license-ref=Own photograph",
+                "--original-policy=reference"
+        });
+        assertEquals(OriginalPolicy.REFERENCE, config.originalPolicy());
+    }
+
+    @Test
+    void rejectsInvalidOriginalPolicy() {
+        assertThrows(IngestException.class, () -> IngestCliConfig.parse(new String[] {
+                "--original=/tmp/photo.jpg",
+                "--image-id=photo",
+                "--display-name=Photo",
+                "--license-ref=Own",
+                "--original-policy=move"
+        }));
     }
 
     @Test
