@@ -44,6 +44,21 @@ class WebSocketFrameParserTest {
         assertEquals("A€B", text);
     }
 
+    @Test
+    void rejectsInvalidContinuationAndFragmentedControlFrame() throws Exception {
+        WebSocketTextAssembler assembler = new WebSocketTextAssembler(1024);
+        WebSocketProtocolException continuation = assertThrows(
+                WebSocketProtocolException.class,
+                () -> assembler.accept(new WebSocketFrame(true, 0x0, new byte[]{1})));
+        assertEquals(1002, continuation.closeCode());
+
+        byte[] fragmentedPing = masked(false, 0x9, new byte[]{1}, new byte[]{1,2,3,4});
+        WebSocketProtocolException control = assertThrows(
+                WebSocketProtocolException.class,
+                () -> new WebSocketFrameParser(1024).feed(ByteBuffer.wrap(fragmentedPing)));
+        assertEquals(1002, control.closeCode());
+    }
+
     private static byte[] masked(boolean fin, int opcode, byte[] payload, byte[] mask) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.write((fin ? 0x80 : 0) | opcode);
