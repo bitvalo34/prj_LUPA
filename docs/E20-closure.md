@@ -27,7 +27,7 @@ Estados usados:
 | OPEN/MANIFEST real | PublishedImageStore sobre catálogo/manifiesto A19 | Código + CI + WSL |
 | VIEW/PLAN | región contenida, viewport limitado y nivel uniforme automático | Código + CI + WSL |
 | contextLevel uniforme | igual a appliedLevel conforme al contrato de modo uniform | Código + CI + WSL |
-| Miniatura primero | z=0 es primer TILE y no se duplica si appliedLevel=0 | Código + CI + WSL |
+| Miniatura primero | z=0 es primer TILE del primer plan tras OPEN; no se repite en VIEW posteriores y no se duplica si appliedLevel=0 | Código + CI + WSL |
 | Selección regional | cursor perezoso con intervalos semiabiertos y bordes exactos | Código + CI |
 | Lectura de teselas | rutas publicadas, <=262144 bytes, JPEG decodificable, dimensiones de borde | Código + CI + WSL |
 | TILE binario | 4 + H + JSON + JPEG, H<=4096, type=TILE y payloadBytes exacto | Código + CI + WSL |
