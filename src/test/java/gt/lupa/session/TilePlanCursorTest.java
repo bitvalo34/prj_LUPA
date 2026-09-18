@@ -38,6 +38,14 @@ class TilePlanCursorTest {
     }
 
     @Test
+    void laterPlanCanSkipOpeningThumbnail() {
+        TilePlanCursor cursor = new TilePlanCursor(manifest, 2, 0, 0, 512, 256, false);
+        assertEquals(List.of(
+                new TilePlanCursor.TileRef(2, 0, 0),
+                new TilePlanCursor.TileRef(2, 1, 0)), drain(cursor));
+    }
+
+    @Test
     void selectedLevelZeroIsNotDuplicated() {
         TilePlanCursor cursor = new TilePlanCursor(manifest, 0, 0, 0, 1024, 768);
         assertEquals(List.of(new TilePlanCursor.TileRef(0, 0, 0)), drain(cursor));
