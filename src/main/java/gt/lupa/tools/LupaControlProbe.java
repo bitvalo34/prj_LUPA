@@ -163,6 +163,9 @@ public final class LupaControlProbe {
         byte[] headerBytes = new byte[headerLength];
         buffer.get(headerBytes);
         JsonNode header = MAPPER.readTree(headerBytes);
+        if (!"TILE".equals(header.path("type").asText())) {
+            throw new IllegalStateException("binary message header type must be TILE");
+        }
         int payloadBytes = requiredInt(header, "payloadBytes");
         if (payloadBytes < 1 || payloadBytes > 262144 || payloadBytes != buffer.remaining()) {
             throw new IllegalStateException("TILE payload length mismatch");
