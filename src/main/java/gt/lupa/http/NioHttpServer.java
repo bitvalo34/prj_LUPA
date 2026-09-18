@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -26,6 +27,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 public final class NioHttpServer implements AutoCloseable {
@@ -36,19 +38,26 @@ public final class NioHttpServer implements AutoCloseable {
     private final Set<Connection> connections = ConcurrentHashMap.newKeySet();
     private final ThreadPoolExecutor workers;
     private final ScheduledExecutorService timers;
-    private final Supplier<WebSocketEndpoint> webSocketEndpoints;
+    private final Function<Executor, WebSocketEndpoint> webSocketEndpointFactory;
     private final AtomicBoolean running = new AtomicBoolean();
     private AsynchronousChannelGroup ioGroup;
     private AsynchronousServerSocketChannel server;
 
     public NioHttpServer(ServerConfig config, HttpRouter router) {
-        this(config, router, () -> new WebSocketEndpoint() {});
+        this(config, router, ignored -> new WebSocketEndpoint() {});
     }
 
     public NioHttpServer(ServerConfig config, HttpRouter router, Supplier<WebSocketEndpoint> webSocketEndpoints) {
+        this(config, router, ignored -> webSocketEndpoints.get());
+    }
+
+    public NioHttpServer(
+            ServerConfig config,
+            HttpRouter router,
+            Function<Executor, WebSocketEndpoint> webSocketEndpointFactory) {
         this.config = config;
         this.router = router;
-        this.webSocketEndpoints = webSocketEndpoints;
+        this.webSocketEndpointFactory = webSocketEndpointFactory;
         this.connectionSlots = new Semaphore(config.maxConnections());
         this.workers = new ThreadPoolExecutor(
                 config.workerThreads(), config.workerThreads(), 0L, TimeUnit.MILLISECONDS,
@@ -239,7 +248,7 @@ public final class NioHttpServer implements AutoCloseable {
             if (finished.get()) return;
             final WebSocketEndpoint endpoint;
             try {
-                endpoint = webSocketEndpoints.get();
+                endpoint = webSocketEndpointFactory.apply(workers);
                 if (endpoint == null) throw new IllegalStateException("WebSocket endpoint factory returned null");
             } catch (RuntimeException e) {
                 finish();
