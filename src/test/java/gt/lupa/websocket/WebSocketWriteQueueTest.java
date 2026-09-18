@@ -47,7 +47,10 @@ class WebSocketWriteQueueTest {
     void rejectsWhenBoundedQueueIsFull() {
         final CompletionHandler<Integer, Void>[] held = new CompletionHandler[1];
         WebSocketWriteQueue queue = new WebSocketWriteQueue(
-                (buffer, handler) -> held[0] = handler,
+                (buffer, handler) -> {
+                    if (buffer.hasRemaining()) buffer.get();
+                    held[0] = handler;
+                },
                 1,
                 failure -> fail(failure));
 
