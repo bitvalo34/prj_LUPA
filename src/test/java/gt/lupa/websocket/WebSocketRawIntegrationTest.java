@@ -114,6 +114,24 @@ class WebSocketRawIntegrationTest {
     }
 
     @Test
+    void normalClientCloseGetsCloseReplyWithSamePayload() throws Exception {
+        startServer();
+        try (Socket socket = connect()) {
+            socket.getOutputStream().write(handshakeRequest());
+            socket.getOutputStream().flush();
+            assertTrue(readHeaders(socket.getInputStream()).startsWith("HTTP/1.1 101"));
+
+            byte[] closePayload = WebSocketFrames.closePayload(1000, "bye");
+            socket.getOutputStream().write(maskedFrame(0x8, closePayload, true));
+            socket.getOutputStream().flush();
+
+            ServerFrame close = readServerFrame(socket.getInputStream());
+            assertEquals(0x8, close.opcode());
+            assertArrayEquals(closePayload, close.payload());
+        }
+    }
+
+    @Test
     void abruptDisconnectDuringQueuedBinarySendCleansConnectionAndServerKeepsAccepting() throws Exception {
         CountDownLatch queued = new CountDownLatch(1);
         CountDownLatch closed = new CountDownLatch(1);
