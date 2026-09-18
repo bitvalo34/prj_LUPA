@@ -36,6 +36,7 @@ public final class LupaSession implements WebSocketEndpoint {
     private final SerialExecutor serial;
     private final LupaJson json = new LupaJson();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicBoolean cleanupScheduled = new AtomicBoolean();
     private final Map<Integer, DeliveryReservation> deliveries = new LinkedHashMap<>();
 
     private volatile Sender sender;
@@ -81,7 +82,8 @@ public final class LupaSession implements WebSocketEndpoint {
 
     @Override
     public void onClosed(int code, String reason) {
-        if (!closed.compareAndSet(false, true)) return;
+        closed.set(true);
+        if (!cleanupScheduled.compareAndSet(false, true)) return;
         try {
             serial.execute(() -> {
                 state = LupaSessionState.CERRADA;
@@ -90,7 +92,7 @@ public final class LupaSession implements WebSocketEndpoint {
                 freeWindowBytes = 0;
             });
         } catch (RejectedExecutionException ignored) {
-            // The connection is already terminal; queued state becomes unreachable with the session.
+            // The connection is terminal and the session becomes unreachable with the transport.
         }
     }
 
