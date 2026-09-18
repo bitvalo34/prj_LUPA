@@ -59,9 +59,7 @@ public final class WebSocketConnection {
         if (finished.get()) return;
         try {
             endpoint.onOpen(new SenderImpl());
-            if (initialBytes != null && initialBytes.length > 0) {
-                process(ByteBuffer.wrap(initialBytes));
-            }
+            if (initialBytes != null && initialBytes.length > 0) process(ByteBuffer.wrap(initialBytes));
             if (!finished.get()) readNext();
         } catch (RuntimeException e) {
             fail(1011, "endpoint failed during open");
@@ -118,7 +116,7 @@ public final class WebSocketConnection {
         switch (frame.opcode()) {
             case 0x8 -> receiveClose(frame.payloadUnsafe());
             case 0x9 -> sendControl(WebSocketFrames.pong(frame.payloadUnsafe()));
-            case 0xA -> { /* pong accepted; heartbeat policy belongs to E22 */ }
+            case 0xA -> { }
             case 0x0, 0x1, 0x2 -> receiveData(frame);
             default -> throw new WebSocketProtocolException(1002, "unsupported opcode");
         }
@@ -234,14 +232,20 @@ public final class WebSocketConnection {
 
         @Override
         public boolean sendBinary(byte[] payload) {
+            return sendBinary(payload, () -> {});
+        }
+
+        @Override
+        public boolean sendBinary(byte[] payload, Runnable onWritten) {
             Objects.requireNonNull(payload);
+            Objects.requireNonNull(onWritten);
             if (payload.length > MAX_SERVER_BINARY_BYTES) {
                 throw new IllegalArgumentException("server binary message exceeds LUPA v1 limit");
             }
             synchronized (stateLock) {
                 if (finished.get() || closeSent) return false;
             }
-            return writes.enqueue(WebSocketFrames.binary(payload), () -> {});
+            return writes.enqueue(WebSocketFrames.binary(payload), onWritten);
         }
 
         @Override

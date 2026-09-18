@@ -1,6 +1,6 @@
 package gt.lupa.websocket;
 
-/** Application hook above RFC 6455. E20's LUPA session will implement this interface. */
+/** Application hook above RFC 6455. E20's LUPA session implements this interface. */
 public interface WebSocketEndpoint {
     default void onOpen(Sender sender) {}
 
@@ -12,7 +12,15 @@ public interface WebSocketEndpoint {
 
     interface Sender {
         boolean sendText(String text);
+
         boolean sendBinary(byte[] payload);
+
+        default boolean sendBinary(byte[] payload, Runnable onWritten) {
+            boolean accepted = sendBinary(payload);
+            if (accepted) onWritten.run();
+            return accepted;
+        }
+
         void close(int code, String reason);
     }
 }
