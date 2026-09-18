@@ -44,7 +44,7 @@ public final class LupaSession implements WebSocketEndpoint {
     private int negotiatedWindowBytes;
     private long freeWindowBytes;
     private long bitmapBudgetBytes;
-    private int nextDeliveryId = 1;
+    private long nextDeliveryId = 1;
     private long planGeneration;
     private PublishedImageStore.OpenedImage opened;
     private ActivePlan activePlan;
@@ -54,10 +54,18 @@ public final class LupaSession implements WebSocketEndpoint {
     }
 
     public LupaSession(PublishedImageStore store, TileReader tileReader, Executor workerExecutor) {
+        this(store, tileReader, workerExecutor, workerExecutor);
+    }
+
+    LupaSession(
+            PublishedImageStore store,
+            TileReader tileReader,
+            Executor stateExecutor,
+            Executor diskExecutor) {
         this.store = Objects.requireNonNull(store);
         this.tileReader = Objects.requireNonNull(tileReader);
-        this.diskExecutor = Objects.requireNonNull(workerExecutor);
-        this.serial = new SerialExecutor(workerExecutor);
+        this.diskExecutor = Objects.requireNonNull(diskExecutor);
+        this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
     }
 
     @Override
@@ -365,7 +373,7 @@ public final class LupaSession implements WebSocketEndpoint {
         }
 
         PendingTile pending = plan.pendingTile;
-        int deliveryId = nextDeliveryId;
+        int deliveryId = (int) nextDeliveryId;
         final byte[] envelope;
         try {
             envelope = buildTileEnvelope(deliveryId, plan.view.epoch(), pending.ref, pending.tile);
