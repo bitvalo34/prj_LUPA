@@ -157,7 +157,7 @@ El recorrido real verificado en WSL envió:
 - las teselas de borde usaron dimensiones reales, por ejemplo 72×256, 256×47 y 72×47;
 - `DONE epoch=2 sentTiles=21`.
 
-La miniatura forma parte de los mismos créditos que las demás teselas.
+La miniatura forma parte de los mismos créditos que las demás teselas y se envía una sola vez en el primer plan posterior a cada OPEN. Los VIEW posteriores de esa misma apertura no deben esperar que z=0 vuelva a llegar.
 
 ## RELEASE
 
