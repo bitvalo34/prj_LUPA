@@ -119,6 +119,7 @@ class LupaWebSocketIntegrationTest {
                                     byte[] headerBytes = new byte[h];
                                     buffer.get(headerBytes);
                                     JsonNode header = mapper.readTree(headerBytes);
+                                    assertEquals("TILE", header.get("type").asText());
                                     assertEquals("jpeg", header.get("codec").asText());
                                     assertEquals(buffer.remaining(), header.get("payloadBytes").asInt());
                                     assertTrue(header.get("w").asInt() > 0 && header.get("w").asInt() <= 256);
