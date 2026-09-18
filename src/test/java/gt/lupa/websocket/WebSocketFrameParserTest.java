@@ -45,6 +45,19 @@ class WebSocketFrameParserTest {
     }
 
     @Test
+    void parsesMultipleFramesFromOneRead() throws Exception {
+        byte[] first = masked(true, 0x1, "a".getBytes(StandardCharsets.UTF_8), new byte[]{1,2,3,4});
+        byte[] second = masked(true, 0x1, "b".getBytes(StandardCharsets.UTF_8), new byte[]{5,6,7,8});
+        ByteBuffer combined = ByteBuffer.allocate(first.length + second.length);
+        combined.put(first).put(second).flip();
+
+        List<WebSocketFrame> frames = new WebSocketFrameParser(1024).feed(combined);
+        assertEquals(2, frames.size());
+        assertEquals("a", new String(frames.get(0).payload(), StandardCharsets.UTF_8));
+        assertEquals("b", new String(frames.get(1).payload(), StandardCharsets.UTF_8));
+    }
+
+    @Test
     void rejectsInvalidContinuationAndFragmentedControlFrame() throws Exception {
         WebSocketTextAssembler assembler = new WebSocketTextAssembler(1024);
         WebSocketProtocolException continuation = assertThrows(
