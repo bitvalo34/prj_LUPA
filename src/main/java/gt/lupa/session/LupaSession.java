@@ -47,6 +47,7 @@ public final class LupaSession implements WebSocketEndpoint {
     private long bitmapBudgetBytes;
     private long nextDeliveryId = 1;
     private long planGeneration;
+    private boolean thumbnailCommittedForOpen;
     private PublishedImageStore.OpenedImage opened;
     private ActivePlan activePlan;
 
@@ -206,6 +207,7 @@ public final class LupaSession implements WebSocketEndpoint {
 
         invalidatePlan();
         opened = candidate;
+        thumbnailCommittedForOpen = false;
         currentEpoch = epoch;
         state = LupaSessionState.IMAGEN_ABIERTA;
         sendManifest(sender, epoch, candidate.manifest());
@@ -271,10 +273,13 @@ public final class LupaSession implements WebSocketEndpoint {
         currentEpoch = epoch;
         long generation = ++planGeneration;
         ViewPlan view = new ViewPlan(epoch, x, y, width, height, viewportWidth, viewportHeight, level);
+        boolean includeOpeningThumbnail = !thumbnailCommittedForOpen;
         activePlan = new ActivePlan(
                 generation,
                 view,
-                new TilePlanCursor(manifest, level, x, y, width, height));
+                new TilePlanCursor(
+                        manifest, level, x, y, width, height, includeOpeningThumbnail),
+                includeOpeningThumbnail);
 
         ObjectNode plan = json.mapper().createObjectNode();
         plan.put("type", "PLAN");
@@ -329,6 +334,8 @@ public final class LupaSession implements WebSocketEndpoint {
         if (deliveries.size() >= LupaProtocol.MAX_IN_FLIGHT) return;
 
         TilePlanCursor.TileRef ref = plan.cursor.next();
+        boolean openingThumbnail = plan.openingThumbnailPending;
+        plan.openingThumbnailPending = false;
         plan.busy = true;
         long generation = plan.generation;
         PublishedImageStore.OpenedImage imageAtRead = opened;
@@ -337,13 +344,16 @@ public final class LupaSession implements WebSocketEndpoint {
             diskExecutor.execute(() -> {
                 try {
                     TileData tile = tileReader.read(imageAtRead, ref.z(), ref.x(), ref.y());
-                    submitSerial(() -> onTileRead(generation, ref, tile, null), sender);
+                    submitSerial(() -> onTileRead(
+                            generation, ref, openingThumbnail, tile, null), sender);
                 } catch (TileReadException e) {
-                    submitSerial(() -> onTileRead(generation, ref, null, e), sender);
+                    submitSerial(() -> onTileRead(
+                            generation, ref, openingThumbnail, null, e), sender);
                 } catch (RuntimeException e) {
                     submitSerial(() -> onTileRead(
                             generation,
                             ref,
+                            openingThumbnail,
                             null,
                             new TileReadException("unexpected tile read failure", e)), sender);
                 }
@@ -357,6 +367,7 @@ public final class LupaSession implements WebSocketEndpoint {
     private void onTileRead(
             long generation,
             TilePlanCursor.TileRef ref,
+            boolean openingThumbnail,
             TileData tile,
             TileReadException failure) {
         ActivePlan plan = activePlan;
@@ -368,7 +379,7 @@ public final class LupaSession implements WebSocketEndpoint {
             return;
         }
 
-        plan.pendingTile = new PendingTile(ref, tile);
+        plan.pendingTile = new PendingTile(ref, tile, openingThumbnail);
         trySendPending(plan);
     }
 
@@ -408,6 +419,9 @@ public final class LupaSession implements WebSocketEndpoint {
 
         boolean accepted = sender.sendBinary(envelope, () ->
                 submitSerial(() -> onTileWritten(plan.generation), sender));
+        if (accepted && pending.openingThumbnail()) {
+            thumbnailCommittedForOpen = true;
+        }
         if (!accepted) {
             DeliveryReservation removed = deliveries.remove(deliveryId);
             if (removed != null) freeWindowBytes += removed.reservedBytes();
@@ -588,15 +602,24 @@ public final class LupaSession implements WebSocketEndpoint {
         private boolean busy;
         private int sentTiles;
         private PendingTile pendingTile;
+        private boolean openingThumbnailPending;
 
-        private ActivePlan(long generation, ViewPlan view, TilePlanCursor cursor) {
+        private ActivePlan(
+                long generation,
+                ViewPlan view,
+                TilePlanCursor cursor,
+                boolean openingThumbnailPending) {
             this.generation = generation;
             this.view = view;
             this.cursor = cursor;
+            this.openingThumbnailPending = openingThumbnailPending;
         }
     }
 
-    private record PendingTile(TilePlanCursor.TileRef ref, TileData tile) {}
+    private record PendingTile(
+            TilePlanCursor.TileRef ref,
+            TileData tile,
+            boolean openingThumbnail) {}
 
     private record DeliveryReservation(int deliveryId, int epoch, int reservedBytes) {}
 }
