@@ -245,6 +245,7 @@ class LupaSessionTest {
         byte[] jsonBytes = new byte[h];
         buffer.get(jsonBytes);
         JsonNode header = mapper.readTree(jsonBytes);
+        assertEquals("TILE", header.get("type").asText());
         assertEquals(buffer.remaining(), header.get("payloadBytes").asInt());
         return header;
     }
