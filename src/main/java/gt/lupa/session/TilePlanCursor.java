@@ -15,7 +15,7 @@ final class TilePlanCursor {
     private final int xEnd;
     private final int yStart;
     private final int yEnd;
-    private boolean thumbnailPending = true;
+    private boolean thumbnailPending;
     private int x;
     private int y;
     private boolean regionDone;
@@ -27,14 +27,28 @@ final class TilePlanCursor {
             int rectY,
             int rectWidth,
             int rectHeight) {
+        this(manifest, selectedLevel, rectX, rectY, rectWidth, rectHeight, true);
+    }
+
+    TilePlanCursor(
+            ImageManifest manifest,
+            int selectedLevel,
+            int rectX,
+            int rectY,
+            int rectWidth,
+            int rectHeight,
+            boolean includeOpeningThumbnail) {
         if (selectedLevel < 0 || selectedLevel >= manifest.levels().size()) {
             throw new IllegalArgumentException("selected level is outside the manifest");
         }
         this.selectedLevel = selectedLevel;
+        this.thumbnailPending = includeOpeningThumbnail;
 
         if (selectedLevel == 0) {
             xStart = xEnd = yStart = yEnd = 0;
-            regionDone = true;
+            x = 0;
+            y = 0;
+            regionDone = includeOpeningThumbnail;
             return;
         }
 
