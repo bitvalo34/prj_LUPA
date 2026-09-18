@@ -15,8 +15,11 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.Executor;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -40,6 +43,32 @@ class LupaSessionRobustnessTest {
         assertFalse(sender.hasType("DONE"));
         assertTrue(sender.binaries.isEmpty());
         assertNull(sender.closeCode);
+    }
+
+    @Test
+    void disconnectWhileTileReadIsPendingDropsLateResult() throws Exception {
+        PublishedImageStore store = publishedImage();
+        ManualExecutor disk = new ManualExecutor();
+        var reader = (gt.lupa.storage.TileReader) (opened, z, x, y) -> {
+            ImageLevel level = opened.manifest().levels().get(z);
+            int w = Math.min(256, level.width() - x * 256);
+            int h = Math.min(256, level.height() - y * 256);
+            return new TileData(new byte[1024], w, h);
+        };
+
+        LupaSession session = new LupaSession(store, reader, Runnable::run, disk);
+        Sender sender = new Sender();
+        session.onOpen(sender);
+        hello(session, sender);
+        open(session, sender, 1);
+        session.onText(sender, view(2));
+        assertEquals(1, disk.size());
+
+        session.onClosed(1006, "abrupt");
+        disk.runAll();
+
+        assertTrue(sender.binaries.isEmpty(), "late disk result must not be emitted after disconnect");
+        assertFalse(sender.hasType("DONE"));
     }
 
     @Test
@@ -118,6 +147,24 @@ class LupaSessionRobustnessTest {
                 dataRoot.resolve("catalog.json"),
                 new CatalogImage("photo", "v1", 1024, 768, 256, 2));
         return new PublishedImageStore(dataRoot);
+    }
+
+    private static final class ManualExecutor implements Executor {
+        private final Queue<Runnable> tasks = new ArrayDeque<>();
+
+        @Override
+        public void execute(Runnable command) {
+            tasks.add(command);
+        }
+
+        int size() {
+            return tasks.size();
+        }
+
+        void runAll() {
+            Runnable task;
+            while ((task = tasks.poll()) != null) task.run();
+        }
     }
 
     private final class Sender implements WebSocketEndpoint.Sender {
