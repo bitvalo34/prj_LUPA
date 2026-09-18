@@ -48,6 +48,69 @@ class WebSocketRawIntegrationTest {
     }
 
     @Test
+    void fragmentedUtf8TextAllowsInterleavedPingAndReassemblesMessage() throws Exception {
+        startServer();
+        try (Socket socket = connect()) {
+            socket.getOutputStream().write(handshakeRequest());
+            socket.getOutputStream().flush();
+            assertTrue(readHeaders(socket.getInputStream()).startsWith("HTTP/1.1 101"));
+
+            byte[] euro = "A€B".getBytes(StandardCharsets.UTF_8);
+            socket.getOutputStream().write(maskedFrame(0x1, new byte[]{euro[0], euro[1]}, false));
+            socket.getOutputStream().write(maskedFrame(0x9, new byte[]{4,3,2,1}, true));
+            socket.getOutputStream().flush();
+
+            ServerFrame pong = readServerFrame(socket.getInputStream());
+            assertEquals(0xA, pong.opcode());
+            assertArrayEquals(new byte[]{4,3,2,1}, pong.payload());
+
+            socket.getOutputStream().write(maskedFrame(
+                    0x0,
+                    new byte[]{euro[2], euro[3], euro[4]},
+                    true));
+            socket.getOutputStream().flush();
+
+            ServerFrame ack = readServerFrame(socket.getInputStream());
+            assertEquals(0x1, ack.opcode());
+            assertEquals("ACK:A€B", new String(ack.payload(), StandardCharsets.UTF_8));
+        }
+    }
+
+    @Test
+    void invalidUtf8ClosesWith1007() throws Exception {
+        startServer();
+        try (Socket socket = connect()) {
+            socket.getOutputStream().write(handshakeRequest());
+            socket.getOutputStream().flush();
+            assertTrue(readHeaders(socket.getInputStream()).startsWith("HTTP/1.1 101"));
+
+            socket.getOutputStream().write(maskedFrame(0x1, new byte[]{(byte)0xc3, 0x28}, true));
+            socket.getOutputStream().flush();
+
+            ServerFrame close = readServerFrame(socket.getInputStream());
+            assertEquals(0x8, close.opcode());
+            assertEquals(1007, closeCode(close.payload()));
+        }
+    }
+
+    @Test
+    void binaryClientMessageClosesWith1003() throws Exception {
+        startServer();
+        try (Socket socket = connect()) {
+            socket.getOutputStream().write(handshakeRequest());
+            socket.getOutputStream().flush();
+            assertTrue(readHeaders(socket.getInputStream()).startsWith("HTTP/1.1 101"));
+
+            socket.getOutputStream().write(maskedFrame(0x2, new byte[]{1,2,3}, true));
+            socket.getOutputStream().flush();
+
+            ServerFrame close = readServerFrame(socket.getInputStream());
+            assertEquals(0x8, close.opcode());
+            assertEquals(1003, closeCode(close.payload()));
+        }
+    }
+
+    @Test
     void rawMaskedPingGetsUnmaskedPongWithSamePayload() throws Exception {
         startServer();
         try (Socket socket = connect()) {
@@ -129,6 +192,11 @@ class WebSocketRawIntegrationTest {
         out.writeBytes(mask);
         for (int i = 0; i < payload.length; i++) out.write(payload[i] ^ mask[i & 3]);
         return out.toByteArray();
+    }
+
+    private static int closeCode(byte[] payload) {
+        assertTrue(payload.length >= 2);
+        return ((payload[0] & 0xff) << 8) | (payload[1] & 0xff);
     }
 
     private static ServerFrame readServerFrame(InputStream in) throws Exception {
