@@ -7,7 +7,7 @@ import java.util.NoSuchElementException;
 
 /**
  * Lazy tile selection for one uniform VIEW.
- * The z=0 thumbnail is always emitted first. The selected region follows without materializing a tile list.
+ * The opening z=0 thumbnail can be emitted first. The selected region follows without materializing a tile list.
  */
 final class TilePlanCursor {
     private final int selectedLevel;
