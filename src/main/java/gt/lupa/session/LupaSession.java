@@ -81,11 +81,17 @@ public final class LupaSession implements WebSocketEndpoint {
 
     @Override
     public void onClosed(int code, String reason) {
-        closed.set(true);
-        state = LupaSessionState.CERRADA;
-        activePlan = null;
-        deliveries.clear();
-        freeWindowBytes = 0;
+        if (!closed.compareAndSet(false, true)) return;
+        try {
+            serial.execute(() -> {
+                state = LupaSessionState.CERRADA;
+                activePlan = null;
+                deliveries.clear();
+                freeWindowBytes = 0;
+            });
+        } catch (RejectedExecutionException ignored) {
+            // The connection is already terminal; queued state becomes unreachable with the session.
+        }
     }
 
     private void handleText(Sender sender, String message) {
@@ -429,6 +435,7 @@ public final class LupaSession implements WebSocketEndpoint {
         }
 
         ObjectNode header = json.mapper().createObjectNode();
+        header.put("type", "TILE");
         header.put("deliveryId", deliveryId);
         header.put("epoch", epoch);
         header.put("imageId", opened.catalogImage().imageId());
@@ -547,6 +554,7 @@ public final class LupaSession implements WebSocketEndpoint {
     }
 
     private void submitSerial(Runnable task, Sender sender) {
+        if (closed.get()) return;
         try {
             serial.execute(task);
         } catch (RejectedExecutionException e) {
