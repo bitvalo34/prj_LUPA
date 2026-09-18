@@ -18,7 +18,37 @@ public record ServerConfig(
         int ioThreads,
         Duration headerTimeout,
         int maxResourceBytes,
-        int maxCatalogBytes) {
+        int maxCatalogBytes,
+        boolean webSocketAllowNoOrigin) {
+
+    public ServerConfig(
+            String host,
+            int port,
+            String catalogMode,
+            Path catalogPath,
+            int maxHeaderBytes,
+            int maxConnections,
+            int workerThreads,
+            int workerQueueCapacity,
+            int ioThreads,
+            Duration headerTimeout,
+            int maxResourceBytes,
+            int maxCatalogBytes) {
+        this(
+                host,
+                port,
+                catalogMode,
+                catalogPath,
+                maxHeaderBytes,
+                maxConnections,
+                workerThreads,
+                workerQueueCapacity,
+                ioThreads,
+                headerTimeout,
+                maxResourceBytes,
+                maxCatalogBytes,
+                true);
+    }
 
     public ServerConfig {
         if (host == null || host.isBlank()) throw new IllegalArgumentException("host is required");
@@ -60,7 +90,8 @@ public record ServerConfig(
                 Math.min(4, cpus),
                 Duration.ofSeconds(5),
                 1024 * 1024,
-                256 * 1024
+                256 * 1024,
+                true
         );
     }
 
@@ -85,7 +116,8 @@ public record ServerConfig(
         for (String key : values.keySet()) {
             if (!switch (key) {
                 case "host", "port", "catalog", "data-root", "catalog-path",
-                        "max-header-bytes", "max-connections", "header-timeout-ms" -> true;
+                        "max-header-bytes", "max-connections", "header-timeout-ms",
+                        "ws-allow-no-origin" -> true;
                 default -> false;
             }) {
                 throw new IllegalArgumentException("unknown argument: --" + key);
@@ -123,7 +155,8 @@ public record ServerConfig(
                         "header-timeout-ms",
                         (int) defaults.headerTimeout().toMillis())),
                 defaults.maxResourceBytes(),
-                defaults.maxCatalogBytes()
+                defaults.maxCatalogBytes(),
+                parseBoolean(values, "ws-allow-no-origin", defaults.webSocketAllowNoOrigin())
         );
     }
 
@@ -143,5 +176,13 @@ public record ServerConfig(
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("--" + name + " must be an integer", e);
         }
+    }
+
+    private static boolean parseBoolean(Map<String, String> values, String name, boolean fallback) {
+        String value = values.get(name);
+        if (value == null) return fallback;
+        if ("true".equalsIgnoreCase(value)) return true;
+        if ("false".equalsIgnoreCase(value)) return false;
+        throw new IllegalArgumentException("--" + name + " must be true or false");
     }
 }

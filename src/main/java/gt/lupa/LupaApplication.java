@@ -24,11 +24,12 @@ public final class LupaApplication {
         server.start();
         Runtime.getRuntime().addShutdownHook(new Thread(server::close, "lupa-shutdown"));
         System.out.printf(
-                "LUPA I19 listening on http://%s:%d/ (catalog=%s, dataRoot=%s)%n",
+                "LUPA server listening on http://%s:%d/ (catalog=%s, dataRoot=%s, wsNoOrigin=%s)%n",
                 config.host(),
                 server.port(),
                 config.catalogMode(),
-                config.dataRoot());
+                config.dataRoot(),
+                config.webSocketAllowNoOrigin());
         new CountDownLatch(1).await();
     }
 }
