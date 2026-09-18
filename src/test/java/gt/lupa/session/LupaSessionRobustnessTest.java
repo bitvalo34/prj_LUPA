@@ -8,11 +8,14 @@ import gt.lupa.storage.CatalogPublisher;
 import gt.lupa.storage.ImageLevel;
 import gt.lupa.storage.ImageManifest;
 import gt.lupa.storage.PublishedImageStore;
+import gt.lupa.storage.PublishedTileReader;
 import gt.lupa.storage.TileData;
 import gt.lupa.websocket.WebSocketEndpoint;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
@@ -69,6 +72,37 @@ class LupaSessionRobustnessTest {
 
         assertTrue(sender.binaries.isEmpty(), "late disk result must not be emitted after disconnect");
         assertFalse(sender.hasType("DONE"));
+    }
+
+    @Test
+    void tileDeletedAfterPlanBeforeDiskReadFailsPlanWithoutDone() throws Exception {
+        PublishedImageStore store = publishedImage();
+        Path tile = temp.resolve("data/pyramids/photo/v1/tiles/0/0_0.jpg");
+        Files.createDirectories(tile.getParent());
+        BufferedImage image = new BufferedImage(256, 192, BufferedImage.TYPE_INT_RGB);
+        assertTrue(ImageIO.write(image, "jpeg", tile.toFile()));
+
+        ManualExecutor disk = new ManualExecutor();
+        LupaSession session = new LupaSession(
+                store,
+                new PublishedTileReader(store, 262144),
+                Runnable::run,
+                disk);
+        Sender sender = new Sender();
+        session.onOpen(sender);
+
+        hello(session, sender);
+        open(session, sender, 1);
+        session.onText(sender, view(2));
+        assertEquals(1, disk.size());
+
+        Files.delete(tile);
+        disk.runAll();
+
+        assertTrue(sender.hasType("PLAN"));
+        assertTrue(sender.hasError("INTERNAL_READ_ERROR"));
+        assertFalse(sender.hasType("DONE"));
+        assertTrue(sender.binaries.isEmpty());
     }
 
     @Test
