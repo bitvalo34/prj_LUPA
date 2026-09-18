@@ -60,6 +60,37 @@ class WebSocketHandshakeTest {
                 )), true));
     }
 
+    @Test
+    void rejectsWrongMethodRejectedOriginAndMissingOriginWhenPolicyRequiresIt() {
+        Map<String, List<String>> headers = Map.of(
+                "host", List.of("localhost:8080"),
+                "upgrade", List.of("websocket"),
+                "connection", List.of("Upgrade"),
+                "sec-websocket-version", List.of("13"),
+                "sec-websocket-key", List.of("dGhlIHNhbXBsZSBub25jZQ=="),
+                "sec-websocket-protocol", List.of("lupa.v1"),
+                "origin", List.of("https://evil.example")
+        );
+
+        HttpRequest post = new HttpRequest("POST", "/lupa", "/lupa", "", "HTTP/1.1", headers);
+        WebSocketHandshake.Rejected method = assertInstanceOf(
+                WebSocketHandshake.Rejected.class,
+                WebSocketHandshake.evaluate(post, true));
+        assertEquals(405, method.response().status());
+
+        WebSocketHandshake.Rejected origin = assertInstanceOf(
+                WebSocketHandshake.Rejected.class,
+                WebSocketHandshake.evaluate(request(headers), true));
+        assertEquals(403, origin.response().status());
+
+        Map<String, List<String>> noOrigin = new java.util.HashMap<>(headers);
+        noOrigin.remove("origin");
+        WebSocketHandshake.Rejected required = assertInstanceOf(
+                WebSocketHandshake.Rejected.class,
+                WebSocketHandshake.evaluate(request(Map.copyOf(noOrigin)), false));
+        assertEquals(403, required.response().status());
+    }
+
     private static HttpRequest request(Map<String, List<String>> headers) {
         return new HttpRequest("GET", "/lupa", "/lupa", "", "HTTP/1.1", headers);
     }
