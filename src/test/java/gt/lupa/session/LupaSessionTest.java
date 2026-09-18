@@ -64,6 +64,31 @@ class LupaSessionTest {
     }
 
     @Test
+    void openingThumbnailIsSentOnlyOnFirstPlanOfSameOpen() throws Exception {
+        PublishedImageStore store = publishedImage();
+        LupaSession session = new LupaSession(store, fakeTileReader(1024), Runnable::run);
+        CapturingSender sender = new CapturingSender();
+        session.onOpen(sender);
+
+        hello(session, sender, 1048576);
+        session.onText(sender, """
+                {"type":"OPEN","epoch":1,"imageId":"photo"}
+                """);
+        session.onText(sender, view(2));
+        assertEquals(5, sender.binaries.size());
+        assertEquals(5, sender.lastJson().get("sentTiles").asInt());
+
+        session.onText(sender, view(3));
+        assertEquals(9, sender.binaries.size(), "second plan should add only four level-1 region tiles");
+        assertEquals("DONE", sender.lastJson().get("type").asText());
+        assertEquals(4, sender.lastJson().get("sentTiles").asInt());
+
+        for (int i = 5; i < 9; i++) {
+            assertEquals(1, header(sender.binaries.get(i)).get("z").asInt());
+        }
+    }
+
+    @Test
     void creditExhaustionPausesAndReleaseResumesWithoutDuplicateCredit() throws Exception {
         PublishedImageStore store = publishedImage();
         LupaSession session = new LupaSession(store, fakeTileReader(140_000), Runnable::run);
