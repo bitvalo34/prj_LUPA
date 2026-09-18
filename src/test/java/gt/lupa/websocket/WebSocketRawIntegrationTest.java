@@ -14,6 +14,9 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -111,6 +114,47 @@ class WebSocketRawIntegrationTest {
     }
 
     @Test
+    void abruptDisconnectDuringQueuedBinarySendCleansConnectionAndServerKeepsAccepting() throws Exception {
+        CountDownLatch queued = new CountDownLatch(1);
+        CountDownLatch closed = new CountDownLatch(1);
+        startServer(() -> new WebSocketEndpoint() {
+            @Override
+            public void onText(Sender sender, String message) {
+                byte[] payload = new byte[250_000];
+                for (int i = 0; i < 24; i++) {
+                    if (!sender.sendBinary(payload)) break;
+                }
+                queued.countDown();
+            }
+
+            @Override
+            public void onClosed(int code, String reason) {
+                closed.countDown();
+            }
+        });
+
+        Socket socket = connect();
+        socket.getOutputStream().write(handshakeRequest());
+        socket.getOutputStream().flush();
+        assertTrue(readHeaders(socket.getInputStream()).startsWith("HTTP/1.1 101"));
+        socket.getOutputStream().write(maskedFrame(0x1, "go".getBytes(StandardCharsets.UTF_8), true));
+        socket.getOutputStream().flush();
+
+        assertTrue(queued.await(2, TimeUnit.SECONDS), "server did not queue binary transfer");
+        socket.setSoLinger(true, 0);
+        socket.close();
+
+        assertTrue(closed.await(2, TimeUnit.SECONDS), "server did not release disconnected WebSocket");
+
+        try (Socket next = connect()) {
+            next.getOutputStream().write("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"
+                    .getBytes(StandardCharsets.ISO_8859_1));
+            next.getOutputStream().flush();
+            assertTrue(readHeaders(next.getInputStream()).startsWith("HTTP/1.1 200"));
+        }
+    }
+
+    @Test
     void rawMaskedPingGetsUnmaskedPongWithSamePayload() throws Exception {
         startServer();
         try (Socket socket = connect()) {
@@ -129,6 +173,15 @@ class WebSocketRawIntegrationTest {
     }
 
     private void startServer() throws Exception {
+        startServer(() -> new WebSocketEndpoint() {
+            @Override
+            public void onText(Sender sender, String message) {
+                sender.sendText("ACK:" + message);
+            }
+        });
+    }
+
+    private void startServer(Supplier<WebSocketEndpoint> endpoints) throws Exception {
         ServerConfig config = new ServerConfig(
                 "127.0.0.1", 0, "fixture", Path.of("data/catalog.json"),
                 16 * 1024, 16, 2, 16, 2, Duration.ofSeconds(2),
@@ -136,12 +189,7 @@ class WebSocketRawIntegrationTest {
         server = new NioHttpServer(
                 config,
                 new HttpRouter(ClasspathCatalogSource.defaultFixture()),
-                () -> new WebSocketEndpoint() {
-                    @Override
-                    public void onText(Sender sender, String message) {
-                        sender.sendText("ACK:" + message);
-                    }
-                });
+                endpoints);
         server.start();
     }
 
