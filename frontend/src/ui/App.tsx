@@ -28,9 +28,15 @@ const INITIAL_SNAPSHOT: ClientSnapshot = {
 
 export function App() {
   const sampleMode = useMemo(() => new URLSearchParams(window.location.search).get('sample') === '1', []);
+  const supportError = useMemo(() => {
+    if (typeof Worker === 'undefined') return 'Este navegador no ofrece Web Workers.';
+    if (typeof createImageBitmap !== 'function') return 'Este navegador no ofrece createImageBitmap.';
+    if (typeof ResizeObserver === 'undefined') return 'Este navegador no ofrece ResizeObserver.';
+    return null;
+  }, []);
   const client = useMemo(
-    () => new LupaClient(sampleMode ? () => new SampleTransport() : undefined),
-    [sampleMode]
+    () => supportError ? null : new LupaClient(sampleMode ? () => new SampleTransport() : undefined),
+    [sampleMode, supportError]
   );
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -59,6 +65,7 @@ export function App() {
   }
 
   useEffect(() => {
+    if (!client) return;
     const unsubscribe = client.subscribe(setSnapshot);
     if (canvasRef.current) client.attachCanvas(canvasRef.current);
     client.connect();
@@ -70,6 +77,7 @@ export function App() {
   }, [client, sampleMode]);
 
   useEffect(() => {
+    if (!client) return;
     const stage = stageRef.current;
     if (!stage) return;
     const observer = new ResizeObserver((entries) => {
@@ -81,8 +89,20 @@ export function App() {
     return () => observer.disconnect();
   }, [client]);
 
+  useEffect(() => {
+    const updateVisibility = () => {
+      document.documentElement.classList.toggle('lupa-hidden', document.hidden);
+    };
+    updateVisibility();
+    document.addEventListener('visibilitychange', updateVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', updateVisibility);
+      document.documentElement.classList.remove('lupa-hidden');
+    };
+  }, []);
+
   function selectImage(image: CatalogImage) {
-    client.selectImage(image);
+    client?.selectImage(image);
   }
 
   return (
@@ -106,7 +126,7 @@ export function App() {
         <div className="header-actions">
           {sampleMode && <span className="sample-badge">MODO MUESTRA</span>}
           <StatusLamp phase={snapshot.phase} />
-          <button className="console-button small" onClick={() => client.reconnect()}>
+          <button className="console-button small" onClick={() => client?.reconnect()} disabled={!client}>
             Reconectar
           </button>
         </div>
@@ -167,10 +187,10 @@ export function App() {
                     <span>La miniatura real llegará como TILE z=0.</span>
                   </div>
                 )}
-                {snapshot.phase === 'error' && (
+                {(snapshot.phase === 'error' || supportError) && (
                   <div className="screen-error" role="alert">
-                    <strong>La señal se interrumpió</strong>
-                    <span>{snapshot.error}</span>
+                    <strong>{supportError ? 'Navegador no compatible' : 'La señal se interrumpió'}</strong>
+                    <span>{supportError ?? snapshot.error}</span>
                   </div>
                 )}
               </div>
@@ -207,7 +227,7 @@ export function App() {
           >
             {diagnosticsOpen ? 'Ocultar diagnóstico' : 'Abrir diagnóstico'}
           </button>
-          <button className="console-button secondary" onClick={() => client.downloadTrace()}>
+          <button className="console-button secondary" onClick={() => client?.downloadTrace()} disabled={!client}>
             Guardar traza
           </button>
         </aside>
