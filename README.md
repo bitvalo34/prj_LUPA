@@ -2,7 +2,9 @@
 
 LUPA (Lectura Ultraresolutiva Progresiva y Adaptativa) — servidor asíncrono académico en Java 21.
 
-## Base integrada S19 + E19 + A19 + I19
+## Base integrada S19 + E19 + A19 + I19 + E20
+
+El transporte E20 está incorporado a `main`. A20 añade el visor **LUPA 64** en `feature/a20-viewer`: React + TypeScript + Vite para controles y catálogo, con WebSocket nativo, Web Worker, ImageBitmap y Canvas 2D fuera del estado React.
 
 Requisitos de desarrollo comprobados:
 
@@ -46,3 +48,6 @@ Documentación:
 - `docs/E19.md` — base HTTP.
 - `docs/A19.md` y `docs/A19_FINAL_VALIDATION.md` — importador/publicación.
 - `docs/I19.md` — integración del catálogo real, comandos y revisión.
+- `docs/E20.md` y `docs/E20-closure.md` — transporte WebSocket/LUPA.
+- `docs/A20.md` — visor, Worker, Canvas, build frontend y evidencia A20.
+- `docs/A20-E20-integration.md` — frontera exacta entre visor y transporte.

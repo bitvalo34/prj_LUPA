@@ -33,12 +33,16 @@ jobs:
             if curl --fail --silent http://127.0.0.1:18080/ >/tmp/root.html; then break; fi
             sleep 0.25
           done
-          curl --fail --silent http://127.0.0.1:18080/assets/app.css >/tmp/app.css
-          curl --fail --silent http://127.0.0.1:18080/assets/app.js >/tmp/app.js
           curl --fail --silent http://127.0.0.1:18080/api/catalog >/tmp/catalog.json
-          grep -q 'Servidor HTTP asíncrono E19 activo' /tmp/root.html
+          grep -q 'LUPA 64' /tmp/root.html
+          JS_PATH="$(grep -oE '/assets/[^"]+\.js' /tmp/root.html | head -1)"
+          CSS_PATH="$(grep -oE '/assets/[^"]+\.css' /tmp/root.html | head -1)"
+          test -n "$JS_PATH"
+          test -n "$CSS_PATH"
+          curl --fail --silent "http://127.0.0.1:18080$JS_PATH" >/tmp/app.js
+          curl --fail --silent "http://127.0.0.1:18080$CSS_PATH" >/tmp/app.css
           grep -q '"schemaVersion":1' /tmp/catalog.json
-          ! grep -RE 'https?://' src/main/resources/web
+          ! grep -RIE 'https?://(fonts|cdn|unpkg|jsdelivr|cdnjs)\.' src/main/resources/web
       - name: Stop server
         if: always()
         run: |

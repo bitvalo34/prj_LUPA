@@ -1,0 +1,95 @@
+name: A20 Frontend CI
+
+on:
+  push:
+    branches: ["feature/a20-viewer"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref_name || github.event.pull_request.head.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Versions
+        run: |
+          node --version
+          npm --version
+          java -version
+          mvn -version
+
+      - name: Install pinned frontend dependencies
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+
+      - name: Frontend unit tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Verify cached offline npm install
+        working-directory: frontend
+        run: |
+          rm -rf node_modules
+          npm ci --offline --ignore-scripts
+
+      - name: Build frontend into Java resources
+        working-directory: frontend
+        run: npm run build
+
+      - name: Verify no remote runtime resources
+        run: |
+          ! grep -RIE 'https?://(fonts|cdn|unpkg|jsdelivr|cdnjs)\.' src/main/resources/web
+          grep -q 'LUPA 64' src/main/resources/web/index.html
+          test -n "$(find src/main/resources/web/assets -type f -name '*.js' -print -quit)"
+          test -n "$(find src/main/resources/web/assets -type f -name '*.css' -print -quit)"
+
+      - name: Maven verify/package with built frontend
+        run: mvn -B clean verify package
+
+      - name: Smoke packaged Java server
+        run: |
+          java -jar target/lupa.jar --host=127.0.0.1 --port=18080 --catalog=fixture > /tmp/lupa-a20.log 2>&1 &
+          echo $! > /tmp/lupa-a20.pid
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:18080/ >/tmp/root.html; then break; fi
+            sleep 0.2
+          done
+          grep -q 'LUPA 64' /tmp/root.html
+          curl --fail --silent http://127.0.0.1:18080/api/catalog >/tmp/catalog.json
+          grep -q '"schemaVersion":1' /tmp/catalog.json
+
+      - name: Commit generated lockfile and production assets
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[a20-build-assets]')
+        run: |
+          git add frontend/package-lock.json src/main/resources/web
+          if git diff --cached --quiet; then
+            echo "Generated artifacts already match the branch."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "A20 build: pin lockfile and production assets [a20-artifacts]"
+          git fetch origin feature/a20-viewer
+          git rebase origin/feature/a20-viewer
+          git push origin HEAD:feature/a20-viewer
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/lupa-a20.pid ]; then kill "$(cat /tmp/lupa-a20.pid)" 2>/dev/null || true; fi
+          cat /tmp/lupa-a20.log 2>/dev/null || true
