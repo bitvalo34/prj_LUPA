@@ -338,7 +338,7 @@ export class LupaClient {
           }
           if (!this.manifest) throw new Error('PLAN sin MANIFEST');
           const plan = parsePlan(control, this.manifest);
-          if (plan.epoch !== this.epoch) return;
+          if (plan.epoch !== this.epoch) throw new Error('PLAN pertenece a una época futura');
           this.plan = plan;
           this.phase = 'receiving';
           this.emitNow();
@@ -350,7 +350,7 @@ export class LupaClient {
             return;
           }
           const done = parseDone(control);
-          if (done.epoch !== this.epoch) return;
+          if (done.epoch !== this.epoch) throw new Error('DONE pertenece a una época futura');
           this.serverDone = true;
           this.doneSentTiles = done.sentTiles;
           this.phase = this.pending.size === 0 && this.pendingPresentations === 0 ? 'observing' : 'processing';
@@ -407,10 +407,14 @@ export class LupaClient {
       return;
     }
 
-    if (header.epoch !== this.epoch) {
+    if (header.epoch < this.epoch) {
       this.discardedTiles++;
       this.release(header.deliveryId, connectionId, 'discarded');
       this.notifySoon();
+      return;
+    }
+    if (header.epoch > this.epoch) {
+      this.protocolViolation(new Error('TILE pertenece a una época futura'));
       return;
     }
 
