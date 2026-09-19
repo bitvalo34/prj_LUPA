@@ -10,7 +10,7 @@ export class BitmapBudget {
 
   reserve(jobId: string, bytes: number): boolean {
     if (!Number.isSafeInteger(bytes) || bytes <= 0 || this.reservations.has(jobId)) return false;
-    if (this.transientBytes + bytes > TRANSIENT_BUDGET_BYTES) return false;
+    if (this.contextBytes + this.transientBytes + bytes > TRANSIENT_BUDGET_BYTES) return false;
     if (this.transientBytes + this.contextBytes + this.detailBytes + bytes > BITMAP_BUDGET_BYTES) return false;
     this.reservations.set(jobId, bytes);
     this.transientBytes += bytes;
