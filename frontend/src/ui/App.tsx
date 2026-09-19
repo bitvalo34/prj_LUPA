@@ -22,6 +22,7 @@ const INITIAL_SNAPSHOT: ClientSnapshot = {
   serverDone: false,
   doneSentTiles: null,
   managedBitmapBytes: 0,
+  activeViewRect: null,
   error: null,
   trace: []
 };
@@ -227,11 +228,27 @@ export function App() {
           <Metric label="Decodificando" value={String(snapshot.pendingDecodes)} />
           <Metric label="Por pintar" value={String(snapshot.pendingPresentations)} />
           <Metric label="Bitmaps LUPA" value={formatBytes(snapshot.managedBitmapBytes)} />
+          <Metric label="Región VIEW" value={formatRect(snapshot.activeViewRect)} />
           <p className="memory-note">Memoria administrada por LUPA; no representa toda la RAM/GPU del navegador.</p>
 
           <button
             className="console-button secondary"
-            onClick={() => setDiagnosticsOpen((value) => !value)}
+            onClick={() => client?.requestCenteredIntegrationRegion()}
+            disabled={!client || !snapshot.manifest}
+            title="Utilidad de integración I20; no es navegación A21"
+          >
+            Probar región central I20
+          </button>
+          <button
+            className="console-button secondary"
+            onClick={() => client?.requestFullView()}
+            disabled={!client || !snapshot.manifest}
+          >
+            Restaurar vista completa
+          </button>
+          <button
+            className="console-button secondary"
+            onClick={() => setDiagnosticsOpen((value) => !value)
             aria-expanded={diagnosticsOpen}
           >
             {diagnosticsOpen ? 'Ocultar diagnóstico' : 'Abrir diagnóstico'}
@@ -388,4 +405,10 @@ function formatBytes(value: number): string {
   if (value < 1024) return value + ' B';
   if (value < 1024 * 1024) return (value / 1024).toFixed(1) + ' KiB';
   return (value / (1024 * 1024)).toFixed(1) + ' MiB';
+}
+
+
+function formatRect(rect: ClientSnapshot['activeViewRect']): string {
+  if (!rect) return '—';
+  return rect.x + ',' + rect.y + ' ' + rect.width + '×' + rect.height;
 }
