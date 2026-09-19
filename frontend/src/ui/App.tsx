@@ -248,7 +248,7 @@ export function App() {
           </button>
           <button
             className="console-button secondary"
-            onClick={() => setDiagnosticsOpen((value) => !value)
+            onClick={() => setDiagnosticsOpen((value) => !value)}
             aria-expanded={diagnosticsOpen}
           >
             {diagnosticsOpen ? 'Ocultar diagnóstico' : 'Abrir diagnóstico'}
