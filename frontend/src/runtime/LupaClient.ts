@@ -158,6 +158,7 @@ export class LupaClient {
       onClose: (code, reason) => {
         if (connectionAtOpen !== this.connectionId) return;
         this.trace.push('LOCAL', 'WS_CLOSE', 'code=' + code + ' ' + reason);
+        this.cleanupConnection(connectionAtOpen);
         if (this.phase !== 'error') this.phase = 'disconnected';
         this.emitNow();
       },
@@ -249,6 +250,24 @@ export class LupaClient {
     this.worker.terminate();
     this.compositor?.destroy();
     this.listeners.clear();
+  }
+
+  private cleanupConnection(connectionId: number): void {
+    this.worker.postMessage({ type: 'reset', connectionId });
+    for (const [jobId, pending] of this.pending) {
+      if (pending.connectionId === connectionId) {
+        this.budget.cancel(jobId);
+        this.pending.delete(jobId);
+      }
+    }
+    this.compositor?.reset();
+    this.budget.reset();
+    this.ledger.clear();
+    this.manifest = null;
+    this.plan = null;
+    this.welcome = null;
+    this.serverDone = false;
+    this.doneSentTiles = null;
   }
 
   private onText(connectionId: number, text: string): void {
