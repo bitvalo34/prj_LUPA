@@ -27,6 +27,7 @@ import { DeliveryLedger } from './DeliveryLedger';
 import { TraceBuffer, type TraceEntry } from './TraceBuffer';
 import type { LupaTransport } from './transport';
 import { WebSocketTransport } from './WebSocketTransport';
+import { deriveTransferPhase } from './state';
 
 export type ViewerPhase =
   | 'disconnected'
@@ -539,13 +540,13 @@ export class LupaClient {
   }
 
   private updateCompletionPhase(): void {
-    if (this.serverDone && this.pending.size === 0 && this.pendingPresentations === 0) {
-      this.phase = 'observing';
-    } else if (this.pending.size > 0 || this.pendingPresentations > 0) {
-      this.phase = 'processing';
-    } else if (this.plan) {
-      this.phase = 'receiving';
-    }
+    const next = deriveTransferPhase(
+      this.serverDone,
+      this.pending.size,
+      this.pendingPresentations,
+      this.plan !== null
+    );
+    if (next) this.phase = next;
   }
 
   private openSelected(): void {
