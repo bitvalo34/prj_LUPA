@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { Catalog, CatalogImage } from '../protocol/types';
 import { loadCatalog } from '../runtime/catalog';
 import { LupaClient, type ClientSnapshot } from '../runtime/LupaClient';
@@ -254,7 +254,7 @@ function Cartridge({
     <button
       className={'cartridge ' + (selected ? 'selected' : '')}
       onClick={onSelect}
-      style={{ '--cart-hue': hue } as React.CSSProperties}
+      style={{ '--cart-hue': hue } as CSSProperties}
       aria-pressed={selected}
     >
       <span className="cart-ridge" aria-hidden="true" />
