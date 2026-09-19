@@ -35,11 +35,17 @@ jobs:
 
       - name: Install pinned frontend dependencies
         working-directory: frontend
-        run: npm install --ignore-scripts
+        run: npm ci --ignore-scripts
 
       - name: Frontend unit tests
         working-directory: frontend
         run: npm test
+
+      - name: Verify cached offline npm install
+        working-directory: frontend
+        run: |
+          rm -rf node_modules
+          npm ci --offline --ignore-scripts
 
       - name: Build frontend into Java resources
         working-directory: frontend
