@@ -32,6 +32,7 @@ export class SampleTransport implements LupaTransport {
   private handlers: TransportHandlers | null = null;
   private opened = false;
   private nextDeliveryId = 1;
+  private thumbnailSent = false;
 
   get isOpen(): boolean {
     return this.opened;
@@ -57,6 +58,7 @@ export class SampleTransport implements LupaTransport {
       return;
     }
     if (message.type === 'OPEN') {
+      this.thumbnailSent = false;
       this.emitText({ ...SAMPLE_MANIFEST, epoch: message.epoch });
       return;
     }
@@ -88,13 +90,14 @@ export class SampleTransport implements LupaTransport {
       makeJpeg(256, 128, 47)
     ]);
     const tiles = [
-      { z: 0, x: 0, y: 0, w: 128, h: 96, payload: thumb },
+      ...(!this.thumbnailSent ? [{ z: 0, x: 0, y: 0, w: 128, h: 96, payload: thumb }] : []),
       { z: 1, x: 0, y: 0, w: 256, h: 256, payload: full },
       { z: 1, x: 1, y: 0, w: 256, h: 256, payload: full.slice(0) },
       { z: 1, x: 0, y: 1, w: 256, h: 128, payload: edge },
       { z: 1, x: 1, y: 1, w: 256, h: 128, payload: edge.slice(0) }
     ];
 
+    if (!this.thumbnailSent) this.thumbnailSent = true;
     for (const tile of tiles) {
       if (!this.opened || !this.handlers) return;
       await delay(45);
