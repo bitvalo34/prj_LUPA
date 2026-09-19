@@ -40,6 +40,8 @@ export function App() {
   );
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const catalogRequestRef = useRef(0);
+  const catalogAbortRef = useRef<AbortController | null>(null);
   const [snapshot, setSnapshot] = useState<ClientSnapshot>(INITIAL_SNAPSHOT);
   const [catalog, setCatalog] = useState<Catalog | null>(sampleMode ? SAMPLE_CATALOG : null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -52,15 +54,21 @@ export function App() {
       setCatalogError(null);
       return;
     }
+    const requestId = ++catalogRequestRef.current;
+    catalogAbortRef.current?.abort();
+    const controller = new AbortController();
+    catalogAbortRef.current = controller;
     setCatalogBusy(true);
     setCatalogError(null);
     try {
-      setCatalog(await loadCatalog());
+      const next = await loadCatalog(controller.signal);
+      if (requestId === catalogRequestRef.current) setCatalog(next);
     } catch (error) {
+      if (controller.signal.aborted || requestId !== catalogRequestRef.current) return;
       setCatalog(null);
       setCatalogError(error instanceof Error ? error.message : 'No se pudo cargar el catálogo');
     } finally {
-      setCatalogBusy(false);
+      if (requestId === catalogRequestRef.current) setCatalogBusy(false);
     }
   }
 
@@ -71,6 +79,7 @@ export function App() {
     client.connect();
     if (!sampleMode) void refreshCatalog();
     return () => {
+      catalogAbortRef.current?.abort();
       unsubscribe();
       client.destroy();
     };
