@@ -102,6 +102,15 @@ export function parseManifest(value: unknown, imageIdExpected: string, epochExpe
   const last = levels[levels.length - 1]!;
   if (first.width > tileSize || first.height > tileSize) throw new Error('z=0 no cabe en una tesela');
   if (last.width !== width || last.height !== height) throw new Error('Nivel máximo incoherente');
+  const maxLevel = levels.length - 1;
+  for (const level of levels) {
+    const divisor = 2 ** (maxLevel - level.z);
+    const expectedWidth = Math.ceil(width / divisor);
+    const expectedHeight = Math.ceil(height / divisor);
+    if (level.width !== expectedWidth || level.height !== expectedHeight) {
+      throw new Error('Dimensiones de nivel no cumplen la pirámide S19 en z=' + level.z);
+    }
+  }
   return { type: 'MANIFEST', epoch, imageId, imageVersion, width, height, levels, tileSize };
 }
 
