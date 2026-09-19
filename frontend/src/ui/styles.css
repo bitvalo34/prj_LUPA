@@ -260,8 +260,16 @@ h1 span {
     0 4px 0 #8e836d;
 }
 
-.console-button:hover,
-.icon-button:hover { filter: brightness(1.05); }
+.console-button:hover:not(:disabled),
+.icon-button:hover:not(:disabled) { filter: brightness(1.05); }
+
+.console-button:disabled,
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: .52;
+  filter: grayscale(.25);
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,.25), 0 2px 0 #777;
+}
 
 .console-button:active,
 .icon-button:active {
@@ -890,4 +898,11 @@ h1 span {
   .cartridge-bay,
   .telemetry-panel { border-color: #29271f; }
   .metric span, .memory-note { color: #39362f; }
+}
+
+
+html.lupa-hidden .ambient-orbit *,
+html.lupa-hidden .status-lamp > span,
+html.lupa-hidden .idle-prism {
+  animation-play-state: paused !important;
 }
