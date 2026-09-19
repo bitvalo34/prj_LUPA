@@ -18,6 +18,7 @@ const INITIAL_SNAPSHOT: ClientSnapshot = {
   failedTiles: 0,
   releases: 0,
   pendingDecodes: 0,
+  pendingPresentations: 0,
   serverDone: false,
   doneSentTiles: null,
   managedBitmapBytes: 0,
@@ -195,6 +196,7 @@ export function App() {
           <Metric label="Descartados" value={String(snapshot.discardedTiles)} />
           <Metric label="RELEASE" value={String(snapshot.releases)} />
           <Metric label="Decodificando" value={String(snapshot.pendingDecodes)} />
+          <Metric label="Por pintar" value={String(snapshot.pendingPresentations)} />
           <Metric label="Bitmaps LUPA" value={formatBytes(snapshot.managedBitmapBytes)} />
           <p className="memory-note">Memoria administrada por LUPA; no representa toda la RAM/GPU del navegador.</p>
 
