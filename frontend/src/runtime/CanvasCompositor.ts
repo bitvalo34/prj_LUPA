@@ -1,0 +1,163 @@
+import type { Manifest, TileHeader, ViewLayout } from '../protocol/types';
+import { tileDestination } from '../protocol/viewMath';
+
+interface BitmapEntry {
+  key: string;
+  header: TileHeader;
+  bitmap: ImageBitmap;
+  bytes: number;
+  kind: 'context' | 'detail';
+}
+
+export class CanvasCompositor {
+  private manifest: Manifest | null = null;
+  private layout: ViewLayout | null = null;
+  private readonly entries = new Map<string, BitmapEntry>();
+  private frame = 0;
+  private currentEpoch = 0;
+
+  constructor(
+    private readonly canvas: HTMLCanvasElement,
+    private readonly onRemoved: (kind: 'context' | 'detail', bytes: number) => void
+  ) {}
+
+  startImage(manifest: Manifest, layout: ViewLayout): void {
+    this.reset();
+    this.manifest = manifest;
+    this.setLayout(layout);
+  }
+
+  setLayout(layout: ViewLayout): void {
+    this.layout = layout;
+    this.canvas.width = layout.canvasWidth;
+    this.canvas.height = layout.canvasHeight;
+    this.canvas.style.width = layout.cssWidth + 'px';
+    this.canvas.style.height = layout.cssHeight + 'px';
+    this.schedulePaint();
+  }
+
+  beginEpoch(epoch: number): void {
+    this.currentEpoch = epoch;
+    for (const [key, entry] of this.entries) {
+      if (entry.kind === 'detail') {
+        entry.bitmap.close();
+        this.entries.delete(key);
+        this.onRemoved(entry.kind, entry.bytes);
+      }
+    }
+    this.schedulePaint();
+  }
+
+  store(header: TileHeader, bitmap: ImageBitmap, bytes: number): void {
+    if (!this.manifest || header.imageId !== this.manifest.imageId || header.imageVersion !== this.manifest.imageVersion) {
+      bitmap.close();
+      return;
+    }
+    if (header.z !== 0 && header.epoch !== this.currentEpoch) {
+      bitmap.close();
+      return;
+    }
+    const key = cacheKey(header);
+    const previous = this.entries.get(key);
+    if (previous) {
+      previous.bitmap.close();
+      this.onRemoved(previous.kind, previous.bytes);
+    }
+    this.entries.set(key, {
+      key,
+      header,
+      bitmap,
+      bytes,
+      kind: header.z === 0 ? 'context' : 'detail'
+    });
+    this.schedulePaint();
+  }
+
+  reset(): void {
+    if (this.frame) cancelAnimationFrame(this.frame);
+    this.frame = 0;
+    for (const entry of this.entries.values()) {
+      entry.bitmap.close();
+      this.onRemoved(entry.kind, entry.bytes);
+    }
+    this.entries.clear();
+    this.manifest = null;
+    this.layout = null;
+    this.currentEpoch = 0;
+    const context = this.canvas.getContext('2d');
+    context?.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+
+  destroy(): void {
+    this.reset();
+  }
+
+  count(): { context: number; detail: number } {
+    let context = 0;
+    let detail = 0;
+    for (const entry of this.entries.values()) {
+      if (entry.kind === 'context') context++;
+      else detail++;
+    }
+    return { context, detail };
+  }
+
+  private schedulePaint(): void {
+    if (this.frame !== 0) return;
+    this.frame = requestAnimationFrame(() => {
+      this.frame = 0;
+      this.paint();
+    });
+  }
+
+  private paint(): void {
+    const manifest = this.manifest;
+    const layout = this.layout;
+    const context = this.canvas.getContext('2d', { alpha: false });
+    if (!manifest || !layout || !context) return;
+
+    context.save();
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.fillStyle = '#171a20';
+    context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    const entries = Array.from(this.entries.values()).sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === 'context' ? -1 : 1;
+      if (a.header.z !== b.header.z) return a.header.z - b.header.z;
+      if (a.header.y !== b.header.y) return a.header.y - b.header.y;
+      return a.header.x - b.header.x;
+    });
+
+    context.beginPath();
+    context.rect(
+      layout.imageRectPx.x,
+      layout.imageRectPx.y,
+      layout.imageRectPx.width,
+      layout.imageRectPx.height
+    );
+    context.clip();
+
+    for (const entry of entries) {
+      const destination = tileDestination(manifest, layout, entry.header);
+      context.drawImage(
+        entry.bitmap,
+        destination.x,
+        destination.y,
+        destination.width,
+        destination.height
+      );
+    }
+    context.restore();
+  }
+}
+
+export function cacheKey(header: TileHeader): string {
+  return [
+    header.imageId,
+    header.imageVersion,
+    header.z,
+    header.x,
+    header.y
+  ].join(':');
+}
