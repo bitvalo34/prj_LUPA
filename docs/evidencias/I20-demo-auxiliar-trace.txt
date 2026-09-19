@@ -1,0 +1,75 @@
+2026-09-19T23:47:52.626Z	LOCAL	CONNECT	conexión local #1
+2026-09-19T23:47:53.470Z	LOCAL	WS_OPEN	lupa.v1
+2026-09-19T23:47:53.470Z	OUT	HELLO	
+2026-09-19T23:47:53.478Z	IN	WELCOME	
+2026-09-19T23:48:49.758Z	OUT	OPEN	epoch=1 imageId=demo-auxiliar
+2026-09-19T23:48:49.773Z	IN	MANIFEST	epoch=1 imageId=demo-auxiliar imageVersion=v1
+2026-09-19T23:48:49.774Z	OUT	VIEW	epoch=2 imageId=demo-auxiliar imageVersion=v1 rect=0,0,1096,815 viewport=892x663
+2026-09-19T23:48:49.776Z	IN	PLAN	epoch=2 appliedLevel=3
+2026-09-19T23:48:49.832Z	IN	TILE	delivery=1 epoch=2 z=0 x=0 y=0 w=137 h=102 jpeg=4133
+2026-09-19T23:48:49.833Z	LOCAL	TILE_SHA256	delivery=1 z=0 x=0 y=0 bytes=4133 sha256=1db9f08ef488717d0b2d441d532e018f96e19250bb798c4359344b1e85db6736
+2026-09-19T23:48:49.837Z	IN	TILE	delivery=2 epoch=2 z=3 x=0 y=0 w=256 h=256 jpeg=14666
+2026-09-19T23:48:49.839Z	IN	TILE	delivery=3 epoch=2 z=3 x=1 y=0 w=256 h=256 jpeg=9168
+2026-09-19T23:48:49.840Z	OUT	RELEASE	deliveryId=1 status=displayed
+2026-09-19T23:48:49.840Z	OUT	RELEASE	deliveryId=2 status=displayed
+2026-09-19T23:48:49.840Z	OUT	RELEASE	deliveryId=3 status=displayed
+2026-09-19T23:48:49.847Z	IN	TILE	delivery=4 epoch=2 z=3 x=2 y=0 w=256 h=256 jpeg=10910
+2026-09-19T23:48:49.847Z	IN	TILE	delivery=5 epoch=2 z=3 x=3 y=0 w=256 h=256 jpeg=2683
+2026-09-19T23:48:49.847Z	IN	TILE	delivery=6 epoch=2 z=3 x=4 y=0 w=72 h=256 jpeg=929
+2026-09-19T23:48:49.848Z	IN	TILE	delivery=7 epoch=2 z=3 x=0 y=1 w=256 h=256 jpeg=19141
+2026-09-19T23:48:49.849Z	IN	TILE	delivery=8 epoch=2 z=3 x=1 y=1 w=256 h=256 jpeg=3013
+2026-09-19T23:48:49.850Z	OUT	RELEASE	deliveryId=4 status=displayed
+2026-09-19T23:48:49.850Z	OUT	RELEASE	deliveryId=5 status=displayed
+2026-09-19T23:48:49.850Z	OUT	RELEASE	deliveryId=6 status=displayed
+2026-09-19T23:48:49.851Z	OUT	RELEASE	deliveryId=7 status=displayed
+2026-09-19T23:48:49.851Z	OUT	RELEASE	deliveryId=8 status=displayed
+2026-09-19T23:48:49.858Z	IN	TILE	delivery=9 epoch=2 z=3 x=2 y=1 w=256 h=256 jpeg=19024
+2026-09-19T23:48:49.858Z	IN	TILE	delivery=10 epoch=2 z=3 x=3 y=1 w=256 h=256 jpeg=4620
+2026-09-19T23:48:49.858Z	IN	TILE	delivery=11 epoch=2 z=3 x=4 y=1 w=72 h=256 jpeg=929
+2026-09-19T23:48:49.858Z	IN	TILE	delivery=12 epoch=2 z=3 x=0 y=2 w=256 h=256 jpeg=20165
+2026-09-19T23:48:49.858Z	IN	TILE	delivery=13 epoch=2 z=3 x=1 y=2 w=256 h=256 jpeg=4295
+2026-09-19T23:48:49.862Z	OUT	RELEASE	deliveryId=9 status=displayed
+2026-09-19T23:48:49.862Z	OUT	RELEASE	deliveryId=10 status=displayed
+2026-09-19T23:48:49.862Z	OUT	RELEASE	deliveryId=11 status=displayed
+2026-09-19T23:48:49.862Z	OUT	RELEASE	deliveryId=12 status=displayed
+2026-09-19T23:48:49.862Z	OUT	RELEASE	deliveryId=13 status=displayed
+2026-09-19T23:48:49.870Z	IN	TILE	delivery=14 epoch=2 z=3 x=2 y=2 w=256 h=256 jpeg=24104
+2026-09-19T23:48:49.870Z	IN	TILE	delivery=15 epoch=2 z=3 x=3 y=2 w=256 h=256 jpeg=11913
+2026-09-19T23:48:49.870Z	IN	TILE	delivery=16 epoch=2 z=3 x=4 y=2 w=72 h=256 jpeg=1465
+2026-09-19T23:48:49.870Z	IN	TILE	delivery=17 epoch=2 z=3 x=0 y=3 w=256 h=47 jpeg=3271
+2026-09-19T23:48:49.870Z	IN	TILE	delivery=18 epoch=2 z=3 x=1 y=3 w=256 h=47 jpeg=2111
+2026-09-19T23:48:49.870Z	IN	TILE	delivery=19 epoch=2 z=3 x=2 y=3 w=256 h=47 jpeg=801
+2026-09-19T23:48:49.870Z	IN	TILE	delivery=20 epoch=2 z=3 x=3 y=3 w=256 h=47 jpeg=801
+2026-09-19T23:48:49.870Z	IN	TILE	delivery=21 epoch=2 z=3 x=4 y=3 w=72 h=47 jpeg=669
+2026-09-19T23:48:49.871Z	IN	DONE	epoch=2 sentTiles=21
+2026-09-19T23:48:49.871Z	LOCAL	DONE_STATE	decode=8 pintura=0
+2026-09-19T23:48:49.872Z	OUT	RELEASE	deliveryId=15 status=displayed
+2026-09-19T23:48:49.883Z	OUT	RELEASE	deliveryId=14 status=displayed
+2026-09-19T23:48:49.883Z	OUT	RELEASE	deliveryId=16 status=displayed
+2026-09-19T23:48:49.883Z	OUT	RELEASE	deliveryId=17 status=displayed
+2026-09-19T23:48:49.883Z	OUT	RELEASE	deliveryId=18 status=displayed
+2026-09-19T23:48:49.883Z	OUT	RELEASE	deliveryId=19 status=displayed
+2026-09-19T23:48:49.883Z	OUT	RELEASE	deliveryId=20 status=displayed
+2026-09-19T23:48:49.883Z	OUT	RELEASE	deliveryId=21 status=displayed
+2026-09-19T23:50:23.875Z	OUT	VIEW	epoch=3 imageId=demo-auxiliar imageVersion=v1 rect=274,204,548,407 viewport=446x331
+2026-09-19T23:50:23.885Z	IN	PLAN	epoch=3 appliedLevel=3
+2026-09-19T23:50:23.886Z	IN	TILE	delivery=22 epoch=3 z=3 x=1 y=0 w=256 h=256 jpeg=9168
+2026-09-19T23:50:23.886Z	IN	TILE	delivery=23 epoch=3 z=3 x=2 y=0 w=256 h=256 jpeg=10910
+2026-09-19T23:50:23.887Z	IN	TILE	delivery=24 epoch=3 z=3 x=3 y=0 w=256 h=256 jpeg=2683
+2026-09-19T23:50:23.887Z	IN	TILE	delivery=25 epoch=3 z=3 x=1 y=1 w=256 h=256 jpeg=3013
+2026-09-19T23:50:23.887Z	IN	TILE	delivery=26 epoch=3 z=3 x=2 y=1 w=256 h=256 jpeg=19024
+2026-09-19T23:50:23.889Z	IN	TILE	delivery=27 epoch=3 z=3 x=3 y=1 w=256 h=256 jpeg=4620
+2026-09-19T23:50:23.890Z	IN	TILE	delivery=28 epoch=3 z=3 x=1 y=2 w=256 h=256 jpeg=4295
+2026-09-19T23:50:23.890Z	IN	TILE	delivery=29 epoch=3 z=3 x=2 y=2 w=256 h=256 jpeg=24104
+2026-09-19T23:50:23.891Z	IN	TILE	delivery=30 epoch=3 z=3 x=3 y=2 w=256 h=256 jpeg=11913
+2026-09-19T23:50:23.891Z	IN	DONE	epoch=3 sentTiles=9
+2026-09-19T23:50:23.891Z	LOCAL	DONE_STATE	decode=1 pintura=8
+2026-09-19T23:50:23.899Z	OUT	RELEASE	deliveryId=22 status=displayed
+2026-09-19T23:50:23.899Z	OUT	RELEASE	deliveryId=23 status=displayed
+2026-09-19T23:50:23.899Z	OUT	RELEASE	deliveryId=24 status=displayed
+2026-09-19T23:50:23.899Z	OUT	RELEASE	deliveryId=25 status=displayed
+2026-09-19T23:50:23.899Z	OUT	RELEASE	deliveryId=26 status=displayed
+2026-09-19T23:50:23.899Z	OUT	RELEASE	deliveryId=27 status=displayed
+2026-09-19T23:50:23.899Z	OUT	RELEASE	deliveryId=28 status=displayed
+2026-09-19T23:50:23.899Z	OUT	RELEASE	deliveryId=29 status=displayed
+2026-09-19T23:50:23.899Z	OUT	RELEASE	deliveryId=30 status=displayed
