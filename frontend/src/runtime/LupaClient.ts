@@ -12,7 +12,7 @@ import {
   type WorkerResponse
 } from '../protocol/types';
 import { computeFitLayout } from '../protocol/viewMath';
-import { parseTileEnvelope } from '../protocol/tileEnvelope';
+import { parseTileEnvelopeBase, validateTileAgainstManifest } from '../protocol/tileEnvelope';
 import {
   parseDone,
   parseError,
@@ -81,6 +81,7 @@ export class LupaClient {
   private epoch = 0;
   private selected: CatalogImage | null = null;
   private manifest: Manifest | null = null;
+  private readonly manifestHistory = new Map<string, Manifest>();
   private plan: Plan | null = null;
   private welcome: Welcome | null = null;
   private viewport: { width: number; height: number; dpr: number } | null = null;
@@ -127,6 +128,7 @@ export class LupaClient {
     this.connectionId++;
     this.epoch = 0;
     this.manifest = null;
+    this.manifestHistory.clear();
     this.plan = null;
     this.welcome = null;
     this.serverDone = false;
@@ -303,9 +305,14 @@ export class LupaClient {
           return;
         }
         case 'MANIFEST': {
+          if (isStaleEpoch(control, this.epoch)) {
+            this.trace.push('LOCAL', 'STALE_MANIFEST', 'epoch=' + String(control.epoch));
+            return;
+          }
           if (!this.selected) throw new Error('MANIFEST sin imagen seleccionada');
           const manifest = parseManifest(control, this.selected.imageId, this.epoch);
           this.manifest = manifest;
+          this.rememberManifest(manifest);
           this.plan = null;
           this.serverDone = false;
           this.doneSentTiles = null;
@@ -325,6 +332,10 @@ export class LupaClient {
           return;
         }
         case 'PLAN': {
+          if (isStaleEpoch(control, this.epoch)) {
+            this.trace.push('LOCAL', 'STALE_PLAN', 'epoch=' + String(control.epoch));
+            return;
+          }
           if (!this.manifest) throw new Error('PLAN sin MANIFEST');
           const plan = parsePlan(control, this.manifest);
           if (plan.epoch !== this.epoch) return;
@@ -334,6 +345,10 @@ export class LupaClient {
           return;
         }
         case 'DONE': {
+          if (isStaleEpoch(control, this.epoch)) {
+            this.trace.push('LOCAL', 'STALE_DONE', 'epoch=' + String(control.epoch));
+            return;
+          }
           const done = parseDone(control);
           if (done.epoch !== this.epoch) return;
           this.serverDone = true;
@@ -349,6 +364,10 @@ export class LupaClient {
         }
         case 'ERROR': {
           const remote = parseError(control);
+          if (remote.epoch !== undefined && remote.epoch < this.epoch) {
+            this.trace.push('LOCAL', 'STALE_ERROR', 'epoch=' + remote.epoch + ' code=' + remote.code);
+            return;
+          }
           this.fail(remote.code + ': ' + remote.message);
           return;
         }
@@ -361,10 +380,13 @@ export class LupaClient {
   }
 
   private onBinary(connectionId: number, buffer: ArrayBuffer): void {
-    if (connectionId !== this.connectionId || !this.manifest || !this.welcome) return;
+    if (connectionId !== this.connectionId || !this.welcome) return;
     let tile;
     try {
-      tile = parseTileEnvelope(buffer, this.manifest, this.welcome.maxTileBytes);
+      tile = parseTileEnvelopeBase(buffer, this.welcome.maxTileBytes);
+      const knownManifest = this.manifestHistory.get(manifestKey(tile.header.imageId, tile.header.imageVersion));
+      if (!knownManifest) throw new Error('TILE no corresponde a una versión MANIFEST conocida');
+      validateTileAgainstManifest(tile, knownManifest);
     } catch (error) {
       this.protocolViolation(error);
       return;
@@ -501,6 +523,17 @@ export class LupaClient {
     this.notifySoon();
   }
 
+  private rememberManifest(manifest: Manifest): void {
+    const key = manifestKey(manifest.imageId, manifest.imageVersion);
+    this.manifestHistory.delete(key);
+    this.manifestHistory.set(key, manifest);
+    while (this.manifestHistory.size > 8) {
+      const oldest = this.manifestHistory.keys().next().value as string | undefined;
+      if (oldest === undefined) break;
+      this.manifestHistory.delete(oldest);
+    }
+  }
+
   private updateCompletionPhase(): void {
     if (this.serverDone && this.pending.size === 0 && this.pendingPresentations === 0) {
       this.phase = 'observing';
@@ -611,4 +644,14 @@ function summarizeControl(control: Record<string, unknown>): string {
     .filter((key) => control[key] !== undefined)
     .map((key) => key + '=' + String(control[key]));
   return parts.join(' ');
+}
+
+
+function manifestKey(imageId: string, imageVersion: string): string {
+  return imageId + ':' + imageVersion;
+}
+
+function isStaleEpoch(control: Record<string, unknown>, currentEpoch: number): boolean {
+  const value = control.epoch;
+  return Number.isSafeInteger(value) && (value as number) >= 1 && (value as number) < currentEpoch;
 }
