@@ -292,6 +292,7 @@ export class LupaClient {
     this.ledger.clear();
     this.manifest = null;
     this.activeViewRect = null;
+    this.firstTileHashRecorded = false;
     this.plan = null;
     this.welcome = null;
     this.serverDone = false;
