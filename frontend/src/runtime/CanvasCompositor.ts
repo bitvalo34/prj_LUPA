@@ -7,6 +7,9 @@ interface BitmapEntry {
   bitmap: ImageBitmap;
   bytes: number;
   kind: 'context' | 'detail';
+  presented: boolean;
+  onPresented: () => void;
+  onDiscarded: () => void;
 }
 
 export class CanvasCompositor {
@@ -40,6 +43,7 @@ export class CanvasCompositor {
     this.currentEpoch = epoch;
     for (const [key, entry] of this.entries) {
       if (entry.kind === 'detail') {
+        if (!entry.presented) entry.onDiscarded();
         entry.bitmap.close();
         this.entries.delete(key);
         this.onRemoved(entry.kind, entry.bytes);
@@ -48,18 +52,25 @@ export class CanvasCompositor {
     this.schedulePaint();
   }
 
-  store(header: TileHeader, bitmap: ImageBitmap, bytes: number): void {
+  store(
+    header: TileHeader,
+    bitmap: ImageBitmap,
+    bytes: number,
+    onPresented: () => void,
+    onDiscarded: () => void
+  ): boolean {
     if (!this.manifest || header.imageId !== this.manifest.imageId || header.imageVersion !== this.manifest.imageVersion) {
       bitmap.close();
-      return;
+      return false;
     }
     if (header.z !== 0 && header.epoch !== this.currentEpoch) {
       bitmap.close();
-      return;
+      return false;
     }
     const key = cacheKey(header);
     const previous = this.entries.get(key);
     if (previous) {
+      if (!previous.presented) previous.onDiscarded();
       previous.bitmap.close();
       this.onRemoved(previous.kind, previous.bytes);
     }
@@ -68,15 +79,20 @@ export class CanvasCompositor {
       header,
       bitmap,
       bytes,
-      kind: header.z === 0 ? 'context' : 'detail'
+      kind: header.z === 0 ? 'context' : 'detail',
+      presented: false,
+      onPresented,
+      onDiscarded
     });
     this.schedulePaint();
+    return true;
   }
 
   reset(): void {
     if (this.frame) cancelAnimationFrame(this.frame);
     this.frame = 0;
     for (const entry of this.entries.values()) {
+      if (!entry.presented) entry.onDiscarded();
       entry.bitmap.close();
       this.onRemoved(entry.kind, entry.bytes);
     }
@@ -147,6 +163,10 @@ export class CanvasCompositor {
         destination.width,
         destination.height
       );
+      if (!entry.presented) {
+        entry.presented = true;
+        entry.onPresented();
+      }
     }
     context.restore();
   }
