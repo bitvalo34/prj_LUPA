@@ -22,7 +22,7 @@ const SAMPLE_MANIFEST = {
   width: 512,
   height: 384,
   levels: [
-    { z: 0, width: 128, height: 96 },
+    { z: 0, width: 256, height: 192 },
     { z: 1, width: 512, height: 384 }
   ],
   tileSize: 256
@@ -85,12 +85,12 @@ export class SampleTransport implements LupaTransport {
 
   private async emitTiles(epoch: number): Promise<void> {
     const [thumb, full, edge] = await Promise.all([
-      makeJpeg(128, 96, 11),
+      makeJpeg(256, 192, 11),
       makeJpeg(256, 256, 29),
       makeJpeg(256, 128, 47)
     ]);
     const tiles = [
-      ...(!this.thumbnailSent ? [{ z: 0, x: 0, y: 0, w: 128, h: 96, payload: thumb }] : []),
+      ...(!this.thumbnailSent ? [{ z: 0, x: 0, y: 0, w: 256, h: 192, payload: thumb }] : []),
       { z: 1, x: 0, y: 0, w: 256, h: 256, payload: full },
       { z: 1, x: 1, y: 0, w: 256, h: 256, payload: full.slice(0) },
       { z: 1, x: 0, y: 1, w: 256, h: 128, payload: edge },
