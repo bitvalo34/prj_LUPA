@@ -83,9 +83,9 @@ export class SampleTransport implements LupaTransport {
 
   private async emitTiles(epoch: number): Promise<void> {
     const [thumb, full, edge] = await Promise.all([
-      fetch('/assets/sample/sample-thumb.jpg').then(assertResponse).then((r) => r.arrayBuffer()),
-      fetch('/assets/sample/sample-tile.jpg').then(assertResponse).then((r) => r.arrayBuffer()),
-      fetch('/assets/sample/sample-edge.jpg').then(assertResponse).then((r) => r.arrayBuffer())
+      makeJpeg(128, 96, 11),
+      makeJpeg(256, 256, 29),
+      makeJpeg(256, 128, 47)
     ]);
     const tiles = [
       { z: 0, x: 0, y: 0, w: 128, h: 96, payload: thumb },
@@ -123,9 +123,33 @@ export class SampleTransport implements LupaTransport {
   }
 }
 
-function assertResponse(response: Response): Response {
-  if (!response.ok) throw new Error('Recurso de muestra no disponible');
-  return response;
+async function makeJpeg(width: number, height: number, seed: number): Promise<ArrayBuffer> {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Canvas de muestra no disponible');
+  context.fillStyle = '#e7dcc0';
+  context.fillRect(0, 0, width, height);
+  for (let y = 0; y < height; y += 16) {
+    for (let x = 0; x < width; x += 16) {
+      const value = (x * 7 + y * 5 + seed * 13) % 255;
+      context.fillStyle = 'rgb(' + value + ',' + ((value + 83) % 255) + ',' + ((255 - value + seed) % 255) + ')';
+      context.fillRect(x, y, 16, 16);
+    }
+  }
+  context.strokeStyle = '#efc84b';
+  context.lineWidth = Math.max(2, Math.floor(width / 64));
+  context.strokeRect(width * .2, height * .2, width * .6, height * .6);
+  context.strokeStyle = '#df6656';
+  context.beginPath();
+  context.moveTo(0, height);
+  context.lineTo(width, 0);
+  context.stroke();
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((result) => result ? resolve(result) : reject(new Error('No se pudo crear JPEG de muestra')), 'image/jpeg', .86);
+  });
+  return blob.arrayBuffer();
 }
 
 function delay(ms: number): Promise<void> {
