@@ -296,7 +296,6 @@ export class LupaClient {
     this.welcome = null;
     this.serverDone = false;
     this.doneSentTiles = null;
-    this.activeViewRect = null;
   }
 
   private onText(connectionId: number, text: string): void {
@@ -589,6 +588,7 @@ export class LupaClient {
     const epoch = this.nextEpoch();
     if (epoch === null) return;
     this.manifest = null;
+    this.activeViewRect = null;
     this.plan = null;
     this.serverDone = false;
     this.doneSentTiles = null;
