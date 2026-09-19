@@ -35,5 +35,6 @@ export class WebSocketTransport implements LupaTransport {
     this.socket = null;
     if (!socket) return;
     if (socket.readyState === WebSocket.OPEN) socket.close(code, reason);
+    else if (socket.readyState === WebSocket.CONNECTING) socket.close();
   }
 }
