@@ -52,6 +52,7 @@ export interface ClientSnapshot {
   failedTiles: number;
   releases: number;
   pendingDecodes: number;
+  pendingPresentations: number;
   serverDone: boolean;
   doneSentTiles: number | null;
   managedBitmapBytes: number;
@@ -93,6 +94,7 @@ export class LupaClient {
   private discardedTiles = 0;
   private failedTiles = 0;
   private releases = 0;
+  private pendingPresentations = 0;
   private serverDone = false;
   private doneSentTiles: number | null = null;
   private destroyed = false;
@@ -136,6 +138,12 @@ export class LupaClient {
     this.compositor?.reset();
     this.budget.reset();
     this.pending.clear();
+    this.pendingPresentations = 0;
+    this.receivedTiles = 0;
+    this.drawnTiles = 0;
+    this.discardedTiles = 0;
+    this.failedTiles = 0;
+    this.releases = 0;
     this.trace.push('LOCAL', 'CONNECT', 'conexión local #' + this.connectionId);
     this.emitNow();
 
@@ -234,6 +242,7 @@ export class LupaClient {
       failedTiles: this.failedTiles,
       releases: this.releases,
       pendingDecodes: this.pending.size,
+      pendingPresentations: this.pendingPresentations,
       serverDone: this.serverDone,
       doneSentTiles: this.doneSentTiles,
       managedBitmapBytes: this.budget.snapshot().managedBytes,
@@ -329,8 +338,12 @@ export class LupaClient {
           if (done.epoch !== this.epoch) return;
           this.serverDone = true;
           this.doneSentTiles = done.sentTiles;
-          this.phase = this.pending.size === 0 ? 'observing' : 'processing';
-          this.trace.push('LOCAL', 'DONE_STATE', 'pendientes=' + this.pending.size);
+          this.phase = this.pending.size === 0 && this.pendingPresentations === 0 ? 'observing' : 'processing';
+          this.trace.push(
+            'LOCAL',
+            'DONE_STATE',
+            'decode=' + this.pending.size + ' pintura=' + this.pendingPresentations
+          );
           this.emitNow();
           return;
         }
@@ -442,9 +455,32 @@ export class LupaClient {
           this.discardedTiles++;
           this.release(response.deliveryId, response.connectionId, 'discarded');
         } else {
-          this.compositor.store(response.header, response.bitmap, bytes);
-          this.drawnTiles++;
-          this.release(response.deliveryId, response.connectionId, 'displayed');
+          this.pendingPresentations++;
+          const accepted = this.compositor.store(
+            response.header,
+            response.bitmap,
+            bytes,
+            () => {
+              this.pendingPresentations = Math.max(0, this.pendingPresentations - 1);
+              this.drawnTiles++;
+              this.release(response.deliveryId, response.connectionId, 'displayed');
+              this.updateCompletionPhase();
+              this.notifySoon();
+            },
+            () => {
+              this.pendingPresentations = Math.max(0, this.pendingPresentations - 1);
+              this.discardedTiles++;
+              this.release(response.deliveryId, response.connectionId, 'discarded');
+              this.updateCompletionPhase();
+              this.notifySoon();
+            }
+          );
+          if (!accepted) {
+            this.pendingPresentations = Math.max(0, this.pendingPresentations - 1);
+            this.budget.removeStored(pending.kind, bytes);
+            this.discardedTiles++;
+            this.release(response.deliveryId, response.connectionId, 'discarded');
+          }
         }
       }
     } else {
@@ -461,10 +497,18 @@ export class LupaClient {
       this.trace.push('LOCAL', response.type.toUpperCase(), response.reason);
     }
 
-    if (this.serverDone && this.pending.size === 0) this.phase = 'observing';
-    else if (this.pending.size > 0) this.phase = 'processing';
-    else if (this.plan) this.phase = 'receiving';
+    this.updateCompletionPhase();
     this.notifySoon();
+  }
+
+  private updateCompletionPhase(): void {
+    if (this.serverDone && this.pending.size === 0 && this.pendingPresentations === 0) {
+      this.phase = 'observing';
+    } else if (this.pending.size > 0 || this.pendingPresentations > 0) {
+      this.phase = 'processing';
+    } else if (this.plan) {
+      this.phase = 'receiving';
+    }
   }
 
   private openSelected(): void {
