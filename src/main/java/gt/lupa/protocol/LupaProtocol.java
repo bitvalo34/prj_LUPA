@@ -10,6 +10,10 @@ public final class LupaProtocol {
     public static final int MAX_EPOCH = 2_147_483_647;
     public static final long MAX_VIEWPORT_PIXELS = 8_294_400L;
 
+    public static final int MAX_FOCUS_RADIUS_PX = 512;
+    public static final int MAX_SELECTION_DESCRIPTORS = 512;
+    public static final long BITMAP_RESERVED_BYTES = 16L * 1024 * 1024;
+
     private LupaProtocol() {}
 
     public enum ErrorCode {

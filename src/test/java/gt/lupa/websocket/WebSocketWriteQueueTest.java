@@ -60,4 +60,79 @@ class WebSocketWriteQueueTest {
         held[0].completed(1, null);
         assertEquals(0, queue.queuedFrames());
     }
+
+    @Test
+    void queuedFrameCanBeCancelledBeforeChannelCommit() {
+        final CompletionHandler<Integer, Void>[] held = new CompletionHandler[1];
+        AtomicInteger committed = new AtomicInteger();
+        AtomicInteger written = new AtomicInteger();
+
+        WebSocketWriteQueue queue = new WebSocketWriteQueue(
+                (buffer, handler) -> {
+                    if (held[0] == null) {
+                        if (buffer.hasRemaining()) buffer.get();
+                        held[0] = handler;
+                    } else {
+                        fail("second frame must remain queued until first completes");
+                    }
+                },
+                4,
+                failure -> fail(failure));
+
+        WebSocketWriteQueue.WriteHandle first = queue.enqueueTracked(
+                ByteBuffer.wrap(new byte[]{1}),
+                committed::incrementAndGet,
+                written::incrementAndGet);
+        WebSocketWriteQueue.WriteHandle second = queue.enqueueTracked(
+                ByteBuffer.wrap(new byte[]{2}),
+                committed::incrementAndGet,
+                written::incrementAndGet);
+
+        assertTrue(first.committed());
+        assertFalse(second.committed());
+        assertTrue(second.cancelIfNotCommitted());
+        assertEquals(1, queue.queuedFrames());
+
+        held[0].completed(1, null);
+        assertEquals(1, committed.get());
+        assertEquals(1, written.get());
+        assertEquals(0, queue.queuedFrames());
+    }
+
+    @Test
+    void partiallyWrittenFrameIsCommittedAndCannotBeCancelled() {
+        final CompletionHandler<Integer, Void>[] held = new CompletionHandler[1];
+        final ByteBuffer[] current = new ByteBuffer[1];
+
+        WebSocketWriteQueue queue = new WebSocketWriteQueue(
+                (buffer, handler) -> {
+                    current[0] = buffer;
+                    held[0] = handler;
+                },
+                4,
+                failure -> fail(failure));
+
+        AtomicInteger commits = new AtomicInteger();
+        AtomicInteger writes = new AtomicInteger();
+        WebSocketWriteQueue.WriteHandle handle = queue.enqueueTracked(
+                ByteBuffer.wrap(new byte[]{1,2,3}),
+                commits::incrementAndGet,
+                writes::incrementAndGet);
+
+        assertTrue(handle.committed());
+        assertFalse(handle.cancelIfNotCommitted());
+        assertEquals(1, commits.get());
+
+        current[0].get();
+        held[0].completed(1, null);
+        assertTrue(handle.committed());
+        assertFalse(handle.cancelIfNotCommitted());
+
+        current[0].get();
+        current[0].get();
+        held[0].completed(2, null);
+
+        assertEquals(1, writes.get());
+        assertEquals(0, queue.queuedFrames());
+    }
 }
