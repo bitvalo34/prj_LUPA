@@ -505,7 +505,7 @@ public final class LupaSession implements WebSocketEndpoint {
         }
 
         PendingTile pending = plan.pendingTile;
-        int deliveryId = deliveryIds.take();
+        int deliveryId = deliveryIds.peek();
         final byte[] envelope;
         try {
             envelope = buildTileEnvelope(deliveryId, plan.view.epoch(), pending.ref, pending.tile);
@@ -520,6 +520,11 @@ public final class LupaSession implements WebSocketEndpoint {
             return;
         }
         if (reservationBytes > freeWindowBytes) return;
+
+        int allocatedDeliveryId = deliveryIds.take();
+        if (allocatedDeliveryId != deliveryId) {
+            throw new IllegalStateException("deliveryId sequence changed inside serialized session state");
+        }
 
         DeliveryReservation reservation = new DeliveryReservation(
                 deliveryId,
