@@ -2,7 +2,7 @@ name: A20 Frontend CI
 
 on:
   push:
-    branches: ["feature/a20-viewer"]
+    branches: ["feature/a20-viewer", "feature/i20-integration"]
   pull_request:
     branches: ["main"]
 
@@ -74,7 +74,7 @@ jobs:
           grep -q '"schemaVersion":1' /tmp/catalog.json
 
       - name: Commit generated lockfile and production assets
-        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[a20-build-assets]')
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[build-assets]')
         run: |
           git add frontend/package-lock.json src/main/resources/web
           if git diff --cached --quiet; then
@@ -84,9 +84,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "A20 build: pin lockfile and production assets [a20-artifacts]"
-          git fetch origin feature/a20-viewer
-          git rebase origin/feature/a20-viewer
-          git push origin HEAD:feature/a20-viewer
+          git fetch origin "$GITHUB_REF_NAME"
+          git rebase "origin/$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
 
       - name: Stop server
         if: always()

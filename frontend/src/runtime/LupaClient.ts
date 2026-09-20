@@ -11,7 +11,13 @@ import {
   type Welcome,
   type WorkerResponse
 } from '../protocol/types';
-import { computeFitLayout } from '../protocol/viewMath';
+import {
+  centeredTestRegion,
+  computeFitLayout,
+  fullViewRect,
+  viewportForRect,
+  type ViewRect
+} from '../protocol/viewMath';
 import { parseTileEnvelopeBase, validateTileAgainstManifest } from '../protocol/tileEnvelope';
 import {
   parseDone,
@@ -57,6 +63,7 @@ export interface ClientSnapshot {
   serverDone: boolean;
   doneSentTiles: number | null;
   managedBitmapBytes: number;
+  activeViewRect: ViewRect | null;
   error: string | null;
   trace: TraceEntry[];
 }
@@ -87,6 +94,8 @@ export class LupaClient {
   private welcome: Welcome | null = null;
   private viewport: { width: number; height: number; dpr: number } | null = null;
   private layout: ViewLayout | null = null;
+  private activeViewRect: ViewRect | null = null;
+  private firstTileHashRecorded = false;
   private resizeTimer = 0;
   private notifyTimer = 0;
   private phase: ViewerPhase = 'disconnected';
@@ -134,6 +143,8 @@ export class LupaClient {
     this.welcome = null;
     this.serverDone = false;
     this.doneSentTiles = null;
+    this.activeViewRect = null;
+    this.firstTileHashRecorded = false;
     this.error = null;
     this.phase = 'connecting';
     this.ledger.clear();
@@ -203,7 +214,7 @@ export class LupaClient {
     this.compositor?.setLayout(this.layout);
 
     if (!previous) {
-      this.requestView();
+      this.requestView(this.activeViewRect ?? fullViewRect(this.manifest));
       return;
     }
     const changed =
@@ -213,7 +224,10 @@ export class LupaClient {
     if (!changed) return;
 
     window.clearTimeout(this.resizeTimer);
-    this.resizeTimer = window.setTimeout(() => this.requestView(), 180);
+    this.resizeTimer = window.setTimeout(
+      () => this.requestView(this.activeViewRect ?? fullViewRect(this.manifest!)),
+      180
+    );
   }
 
   downloadTrace(): void {
@@ -249,6 +263,7 @@ export class LupaClient {
       serverDone: this.serverDone,
       doneSentTiles: this.doneSentTiles,
       managedBitmapBytes: this.budget.snapshot().managedBytes,
+      activeViewRect: this.activeViewRect ? { ...this.activeViewRect } : null,
       error: this.error,
       trace: this.trace.snapshot()
     };
@@ -276,6 +291,8 @@ export class LupaClient {
     this.budget.reset();
     this.ledger.clear();
     this.manifest = null;
+    this.activeViewRect = null;
+    this.firstTileHashRecorded = false;
     this.plan = null;
     this.welcome = null;
     this.serverDone = false;
@@ -327,7 +344,8 @@ export class LupaClient {
               this.viewport.dpr
             );
             this.compositor?.startImage(manifest, this.layout);
-            this.requestView();
+            this.activeViewRect = fullViewRect(manifest);
+            this.requestView(this.activeViewRect);
           }
           this.emitNow();
           return;
@@ -400,8 +418,25 @@ export class LupaClient {
       'TILE',
       'delivery=' + header.deliveryId + ' epoch=' + header.epoch +
         ' z=' + header.z + ' x=' + header.x + ' y=' + header.y +
+        ' w=' + header.w + ' h=' + header.h +
         ' jpeg=' + header.payloadBytes
     );
+    if (!this.firstTileHashRecorded) {
+      this.firstTileHashRecorded = true;
+      const copy = tile.buffer.slice(tile.payloadOffset, tile.payloadOffset + tile.payloadBytes);
+      void crypto.subtle.digest('SHA-256', copy).then((digest) => {
+        const hash = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('');
+        this.trace.push(
+          'LOCAL',
+          'TILE_SHA256',
+          'delivery=' + header.deliveryId + ' z=' + header.z + ' x=' + header.x + ' y=' + header.y +
+            ' bytes=' + header.payloadBytes + ' sha256=' + hash
+        );
+        this.notifySoon();
+      }).catch(() => {
+        this.trace.push('LOCAL', 'TILE_SHA256', 'digest no disponible');
+      });
+    }
 
     if (!this.ledger.register(header.deliveryId, connectionId)) {
       this.protocolViolation(new Error('deliveryId duplicado'));
@@ -554,6 +589,7 @@ export class LupaClient {
     const epoch = this.nextEpoch();
     if (epoch === null) return;
     this.manifest = null;
+    this.activeViewRect = null;
     this.plan = null;
     this.serverDone = false;
     this.doneSentTiles = null;
@@ -564,13 +600,26 @@ export class LupaClient {
     this.emitNow();
   }
 
-  private requestView(): void {
+  requestCenteredIntegrationRegion(): void {
+    if (!this.manifest) return;
+    const rect = centeredTestRegion(this.manifest);
+    this.requestView(rect);
+  }
+
+  requestFullView(): void {
+    if (!this.manifest) return;
+    this.requestView(fullViewRect(this.manifest));
+  }
+
+  private requestView(rect: ViewRect): void {
     if (!this.manifest || !this.layout || !this.selected || !this.transport?.isOpen) return;
+    const viewportPx = viewportForRect(this.manifest, this.layout, rect);
     const epoch = this.nextEpoch();
     if (epoch === null) return;
     this.serverDone = false;
     this.doneSentTiles = null;
     this.plan = null;
+    this.activeViewRect = { ...rect };
     this.worker.postMessage({ type: 'invalidate', connectionId: this.connectionId, minEpoch: epoch });
     this.compositor?.beginEpoch(epoch);
     this.phase = 'receiving';
@@ -579,8 +628,8 @@ export class LupaClient {
       epoch,
       imageId: this.manifest.imageId,
       imageVersion: this.manifest.imageVersion,
-      rect: { x: 0, y: 0, width: this.manifest.width, height: this.manifest.height },
-      viewportPx: this.layout.viewportPx,
+      rect,
+      viewportPx,
       detailOffset: 0,
       mode: 'uniform',
       focus: null
@@ -648,6 +697,19 @@ function summarizeControl(control: Record<string, unknown>): string {
   const parts = keys
     .filter((key) => control[key] !== undefined)
     .map((key) => key + '=' + String(control[key]));
+
+  if (control.type === 'VIEW') {
+    const rect = control.rect as Record<string, unknown> | undefined;
+    const viewport = control.viewportPx as Record<string, unknown> | undefined;
+    if (rect) {
+      parts.push(
+        'rect=' + [rect.x, rect.y, rect.width, rect.height].map(String).join(',')
+      );
+    }
+    if (viewport) {
+      parts.push('viewport=' + [viewport.width, viewport.height].map(String).join('x'));
+    }
+  }
   return parts.join(' ');
 }
 

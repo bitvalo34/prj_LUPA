@@ -89,6 +89,39 @@ class LupaSessionTest {
     }
 
     @Test
+    void partialRegionAfterOpeningSendsOnlyIntersectingDetailTile() throws Exception {
+        PublishedImageStore store = publishedImage();
+        LupaSession session = new LupaSession(store, fakeTileReader(1024), Runnable::run);
+        CapturingSender sender = new CapturingSender();
+        session.onOpen(sender);
+
+        hello(session, sender, 1048576);
+        session.onText(sender, """
+                {"type":"OPEN","epoch":1,"imageId":"photo"}
+                """);
+        session.onText(sender, view(2));
+        assertEquals(5, sender.binaries.size());
+
+        int before = sender.binaries.size();
+        session.onText(sender, """
+                {"type":"VIEW","epoch":3,"imageId":"photo","imageVersion":"v1",
+                 "rect":{"x":256,"y":192,"width":256,"height":192},
+                 "viewportPx":{"width":128,"height":96},
+                 "detailOffset":0,"mode":"uniform","focus":null}
+                """);
+
+        assertEquals(before + 1, sender.binaries.size(),
+                "partial region must not resend the thumbnail or all level tiles");
+        JsonNode tile = header(sender.binaries.getLast());
+        assertEquals(3, tile.get("epoch").asInt());
+        assertEquals(1, tile.get("z").asInt());
+        assertEquals(0, tile.get("x").asInt());
+        assertEquals(0, tile.get("y").asInt());
+        assertEquals("DONE", sender.lastJson().get("type").asText());
+        assertEquals(1, sender.lastJson().get("sentTiles").asInt());
+    }
+
+    @Test
     void creditExhaustionPausesAndReleaseResumesWithoutDuplicateCredit() throws Exception {
         PublishedImageStore store = publishedImage();
         LupaSession session = new LupaSession(store, fakeTileReader(140_000), Runnable::run);

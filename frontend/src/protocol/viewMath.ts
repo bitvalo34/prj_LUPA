@@ -1,5 +1,12 @@
 import { MAX_CANVAS_PIXELS, type Manifest, type TileHeader, type ViewLayout } from './types';
 
+export interface ViewRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export function computeFitLayout(
   imageWidth: number,
   imageHeight: number,
@@ -54,5 +61,39 @@ export function tileDestination(
     y: layout.imageRectPx.y + (originalY0 / manifest.height) * layout.imageRectPx.height,
     width: ((originalX1 - originalX0) / manifest.width) * layout.imageRectPx.width,
     height: ((originalY1 - originalY0) / manifest.height) * layout.imageRectPx.height
+  };
+}
+
+
+export function fullViewRect(manifest: Manifest): ViewRect {
+  return { x: 0, y: 0, width: manifest.width, height: manifest.height };
+}
+
+export function centeredTestRegion(manifest: Manifest): ViewRect {
+  const width = Math.max(1, Math.floor(manifest.width / 2));
+  const height = Math.max(1, Math.floor(manifest.height / 2));
+  return {
+    x: Math.floor((manifest.width - width) / 2),
+    y: Math.floor((manifest.height - height) / 2),
+    width,
+    height
+  };
+}
+
+export function viewportForRect(
+  manifest: Manifest,
+  layout: ViewLayout,
+  rect: ViewRect
+): { width: number; height: number } {
+  if (
+    rect.x < 0 || rect.y < 0 || rect.width < 1 || rect.height < 1 ||
+    rect.x + rect.width > manifest.width ||
+    rect.y + rect.height > manifest.height
+  ) {
+    throw new Error('Región VIEW fuera de la imagen');
+  }
+  return {
+    width: Math.max(1, Math.round(layout.imageRectPx.width * rect.width / manifest.width)),
+    height: Math.max(1, Math.round(layout.imageRectPx.height * rect.height / manifest.height))
   };
 }
