@@ -10,6 +10,7 @@ import gt.lupa.storage.ImageManifest;
 import gt.lupa.storage.PublishedImageStore;
 import gt.lupa.storage.PublishedTileReader;
 import gt.lupa.storage.TileData;
+import gt.lupa.storage.TileReadException;
 import gt.lupa.websocket.WebSocketEndpoint;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -45,6 +46,47 @@ class LupaSessionRobustnessTest {
         assertTrue(sender.hasError("INTERNAL_READ_ERROR"));
         assertFalse(sender.hasType("DONE"));
         assertTrue(sender.binaries.isEmpty());
+        LupaSession.SessionSnapshot snapshot = session.snapshotForTest();
+        assertEquals(snapshot.negotiatedWindowBytes(), snapshot.freeWindowBytes());
+        assertEquals(0, snapshot.reservedBytes());
+        assertNull(sender.closeCode);
+    }
+
+    @Test
+    void staleReadFailureFromReplacedPlanIsIgnoredAndCurrentPlanCompletes() throws Exception {
+        PublishedImageStore store = publishedImage();
+        ManualExecutor disk = new ManualExecutor();
+        int[] reads = {0};
+        var reader = (gt.lupa.storage.TileReader) (opened, z, x, y) -> {
+            reads[0]++;
+            if (reads[0] == 1) {
+                throw new TileReadException("obsolete read failed");
+            }
+            ImageLevel level = opened.manifest().levels().get(z);
+            int w = Math.min(256, level.width() - x * 256);
+            int h = Math.min(256, level.height() - y * 256);
+            return new TileData(new byte[1024], w, h);
+        };
+
+        LupaSession session = new LupaSession(store, reader, Runnable::run, disk);
+        Sender sender = new Sender();
+        session.onOpen(sender);
+        hello(session, sender);
+        open(session, sender, 1);
+
+        session.onText(sender, view(2));
+        session.onText(sender, view(3));
+        assertEquals(2, disk.size());
+
+        disk.runAll();
+
+        assertFalse(sender.hasError("INTERNAL_READ_ERROR"),
+                "failure from invalidated epoch must not poison the current plan");
+        assertTrue(sender.hasDoneForEpoch(3));
+        assertFalse(sender.hasDoneForEpoch(2));
+        LupaSession.SessionSnapshot snapshot = session.snapshotForTest();
+        assertEquals(snapshot.negotiatedWindowBytes(),
+                snapshot.freeWindowBytes() + snapshot.reservedBytes());
         assertNull(sender.closeCode);
     }
 
@@ -243,6 +285,15 @@ class LupaSessionRobustnessTest {
                 JsonNode node = mapper.readTree(text);
                 if ("ERROR".equals(node.path("type").asText())
                         && code.equals(node.path("code").asText())) return true;
+            }
+            return false;
+        }
+
+        boolean hasDoneForEpoch(int epoch) throws Exception {
+            for (String text : texts) {
+                JsonNode node = mapper.readTree(text);
+                if ("DONE".equals(node.path("type").asText())
+                        && epoch == node.path("epoch").asInt()) return true;
             }
             return false;
         }
