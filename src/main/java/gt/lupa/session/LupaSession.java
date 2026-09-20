@@ -331,12 +331,69 @@ public final class LupaSession implements WebSocketEndpoint {
                 selected,
                 new PlannedTileCursor(selected));
 
-        ObjectNode plan = json.mapper().createObjectNode();
-        plan.put("type", "PLAN");
-        plan.put("epoch", epoch);
-        plan.put("appliedLevel", selected.appliedLevel());
-        plan.put("contextLevel", selected.contextLevel());
-        if (sendJson(sender, plan)) pump();
+        ObjectNode planControl = json.mapper().createObjectNode();
+        planControl.put("type", "PLAN");
+        planControl.put("epoch", epoch);
+        planControl.put("appliedLevel", selected.appliedLevel());
+        planControl.put("contextLevel", selected.contextLevel());
+        sendPlanControl(activePlan, planControl);
+    }
+
+    private void sendPlanControl(ActivePlan plan, ObjectNode control) {
+        final String encoded;
+        try {
+            encoded = json.mapper().writeValueAsString(control);
+        } catch (JsonProcessingException e) {
+            failPlan(plan, LupaProtocol.ErrorCode.INTERNAL_READ_ERROR, "PLAN could not be encoded");
+            return;
+        }
+
+        WebSocketEndpoint.TrackedSend write = sender.sendTextTracked(
+                encoded,
+                () -> submitSerial(() -> onPlanCommitted(plan.generation), sender),
+                () -> {});
+        plan.planWrite = write;
+        if (!write.accepted()) {
+            activePlan = null;
+            closed.set(true);
+            state = LupaSessionState.CERRADA;
+            sender.close(1011, "WebSocket write queue is full");
+        }
+    }
+
+    private void onPlanCommitted(long generation) {
+        ActivePlan plan = activePlan;
+        if (plan == null || plan.generation != generation) return;
+        plan.planCommitted = true;
+        pump();
+    }
+
+    private void sendDoneControl(ActivePlan plan, ObjectNode control) {
+        final String encoded;
+        try {
+            encoded = json.mapper().writeValueAsString(control);
+        } catch (JsonProcessingException e) {
+            failPlan(plan, LupaProtocol.ErrorCode.INTERNAL_READ_ERROR, "DONE could not be encoded");
+            return;
+        }
+
+        WebSocketEndpoint.TrackedSend write = sender.sendTextTracked(
+                encoded,
+                () -> submitSerial(() -> onDoneCommitted(plan.generation), sender),
+                () -> {});
+        plan.doneWrite = write;
+        if (!write.accepted()) {
+            activePlan = null;
+            closed.set(true);
+            state = LupaSessionState.CERRADA;
+            sender.close(1011, "WebSocket write queue is full");
+        }
+    }
+
+    private void onDoneCommitted(long generation) {
+        ActivePlan plan = activePlan;
+        if (plan == null || plan.generation != generation) return;
+        activePlan = null;
     }
 
     private void handleRelease(Sender sender, ObjectNode control) throws LupaControlException {
@@ -365,7 +422,7 @@ public final class LupaSession implements WebSocketEndpoint {
     private void pump() {
         if (closed.get()) return;
         ActivePlan plan = activePlan;
-        if (plan == null || plan.busy) return;
+        if (plan == null || plan.busy || !plan.planCommitted) return;
 
         if (plan.pendingTile != null) {
             trySendPending(plan);
@@ -373,12 +430,14 @@ public final class LupaSession implements WebSocketEndpoint {
         }
 
         if (!plan.cursor.hasNext()) {
-            ObjectNode done = json.mapper().createObjectNode();
-            done.put("type", "DONE");
-            done.put("epoch", plan.view.epoch());
-            done.put("sentTiles", plan.sentTiles);
-            activePlan = null;
-            sendJson(sender, done);
+            if (!plan.doneQueued) {
+                plan.doneQueued = true;
+                ObjectNode done = json.mapper().createObjectNode();
+                done.put("type", "DONE");
+                done.put("epoch", plan.view.epoch());
+                done.put("sentTiles", plan.sentTiles);
+                sendDoneControl(plan, done);
+            }
             return;
         }
 
@@ -557,6 +616,8 @@ public final class LupaSession implements WebSocketEndpoint {
         if (activePlan != plan) return;
         activePlan = null;
         planGeneration++;
+        cancelUncommittedControl(plan.planWrite);
+        cancelUncommittedControl(plan.doneWrite);
         cancelUncommittedDeliveries(plan.generation);
         sendError(sender, plan.view.epoch(), code, message);
     }
@@ -577,8 +638,14 @@ public final class LupaSession implements WebSocketEndpoint {
         activePlan = null;
         planGeneration++;
         if (invalidated != null) {
+            cancelUncommittedControl(invalidated.planWrite);
+            cancelUncommittedControl(invalidated.doneWrite);
             cancelUncommittedDeliveries(invalidated.generation);
         }
+    }
+
+    private static void cancelUncommittedControl(WebSocketEndpoint.TrackedSend write) {
+        if (write != null) write.cancelIfNotCommitted();
     }
 
     private void cancelUncommittedDeliveries(long generation) {
@@ -712,6 +779,10 @@ public final class LupaSession implements WebSocketEndpoint {
         private final ViewRequest view;
         private final ViewPlanner.Plan selection;
         private final PlannedTileCursor cursor;
+        private boolean planCommitted;
+        private WebSocketEndpoint.TrackedSend planWrite;
+        private boolean doneQueued;
+        private WebSocketEndpoint.TrackedSend doneWrite;
         private boolean busy;
         private int sentTiles;
         private PendingTile pendingTile;
