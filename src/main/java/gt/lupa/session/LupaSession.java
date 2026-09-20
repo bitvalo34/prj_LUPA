@@ -188,26 +188,63 @@ public final class LupaSession implements WebSocketEndpoint {
             return;
         }
 
-        final CatalogImage listed;
+        /*
+         * Storage validation is intentionally off the serialized session executor. The result is
+         * committed only if its epoch is still newer than the last accepted intent. Therefore a
+         * late OPEN can never replace a later successful OPEN/VIEW, while a later OPEN that fails
+         * storage validation does not consume the epoch or destroy the current image/plan.
+         */
         try {
-            listed = store.readCatalog().images().stream()
-                    .filter(image -> image.imageId().equals(imageId))
-                    .findFirst()
-                    .orElse(null);
-        } catch (CatalogException e) {
-            sendError(sender, epoch, LupaProtocol.ErrorCode.IMAGE_NOT_READY, "published catalog is not readable");
-            return;
-        }
-        if (listed == null) {
-            sendError(sender, epoch, LupaProtocol.ErrorCode.IMAGE_NOT_FOUND, "image is not published");
-            return;
-        }
+            diskExecutor.execute(() -> {
+                PublishedImageStore.OpenedImage candidate = null;
+                LupaProtocol.ErrorCode failureCode = null;
+                String failureMessage = null;
+                try {
+                    boolean listed = store.readCatalog().images().stream()
+                            .anyMatch(image -> image.imageId().equals(imageId));
+                    if (!listed) {
+                        failureCode = LupaProtocol.ErrorCode.IMAGE_NOT_FOUND;
+                        failureMessage = "image is not published";
+                    } else {
+                        candidate = store.openCurrent(imageId);
+                    }
+                } catch (CatalogException e) {
+                    failureCode = LupaProtocol.ErrorCode.IMAGE_NOT_READY;
+                    failureMessage = "published image is not ready";
+                }
 
-        final PublishedImageStore.OpenedImage candidate;
-        try {
-            candidate = store.openCurrent(imageId);
-        } catch (CatalogException e) {
-            sendError(sender, epoch, LupaProtocol.ErrorCode.IMAGE_NOT_READY, "published image is not ready");
+                PublishedImageStore.OpenedImage resolved = candidate;
+                LupaProtocol.ErrorCode resolvedFailureCode = failureCode;
+                String resolvedFailureMessage = failureMessage;
+                submitSerial(
+                        () -> onOpenResolved(
+                                sender,
+                                epoch,
+                                resolved,
+                                resolvedFailureCode,
+                                resolvedFailureMessage),
+                        sender);
+            });
+        } catch (RejectedExecutionException e) {
+            sendError(sender, epoch, LupaProtocol.ErrorCode.IMAGE_NOT_READY, "server storage queue is full");
+        }
+    }
+
+    private void onOpenResolved(
+            Sender sender,
+            int epoch,
+            PublishedImageStore.OpenedImage candidate,
+            LupaProtocol.ErrorCode failureCode,
+            String failureMessage) {
+        if (closed.get() || state == LupaSessionState.CERRADA) return;
+        if (epoch <= currentEpoch) return;
+
+        if (failureCode != null || candidate == null) {
+            sendError(
+                    sender,
+                    epoch,
+                    failureCode == null ? LupaProtocol.ErrorCode.IMAGE_NOT_READY : failureCode,
+                    failureMessage == null ? "published image is not ready" : failureMessage);
             return;
         }
 
@@ -288,7 +325,8 @@ public final class LupaSession implements WebSocketEndpoint {
         DeliveryReservation reservation = deliveries.remove(deliveryId);
         if (reservation == null) return;
 
-        freeWindowBytes += reservation.reservedBytes();
+        reservation.state = DeliveryState.RELEASED;
+        freeWindowBytes += reservation.reservedBytes;
         enforceCreditInvariant(sender);
         pump();
     }
@@ -390,7 +428,12 @@ public final class LupaSession implements WebSocketEndpoint {
         }
         if (reservationBytes > freeWindowBytes) return;
 
-        DeliveryReservation reservation = new DeliveryReservation(deliveryId, plan.view.epoch(), reservationBytes);
+        DeliveryReservation reservation = new DeliveryReservation(
+                deliveryId,
+                plan.view.epoch(),
+                plan.generation,
+                reservationBytes,
+                pending.openingThumbnail());
         deliveries.put(deliveryId, reservation);
         freeWindowBytes -= reservationBytes;
         nextDeliveryId++;
@@ -399,22 +442,42 @@ public final class LupaSession implements WebSocketEndpoint {
         enforceCreditInvariant(sender);
         if (closed.get()) return;
 
-        boolean accepted = sender.sendBinary(envelope, () ->
-                submitSerial(() -> onTileWritten(plan.generation), sender));
-        if (accepted && pending.openingThumbnail()) {
-            thumbnailCommittedForOpen = true;
-        }
-        if (!accepted) {
+        WebSocketEndpoint.BinarySend write = sender.sendBinaryTracked(
+                envelope,
+                () -> submitSerial(() -> onTileCommitted(deliveryId), sender),
+                () -> submitSerial(() -> onTileWritten(plan.generation, deliveryId), sender));
+        reservation.write = write;
+
+        if (!write.accepted()) {
             DeliveryReservation removed = deliveries.remove(deliveryId);
-            if (removed != null) freeWindowBytes += removed.reservedBytes();
+            if (removed != null) {
+                removed.state = DeliveryState.CANCELLED;
+                freeWindowBytes += removed.reservedBytes;
+            }
             plan.busy = false;
+            enforceCreditInvariant(sender);
             closed.set(true);
             state = LupaSessionState.CERRADA;
             sender.close(1011, "WebSocket write queue is full");
         }
     }
 
-    private void onTileWritten(long generation) {
+    private void onTileCommitted(int deliveryId) {
+        DeliveryReservation reservation = deliveries.get(deliveryId);
+        if (reservation == null) return; // RELEASE may have arrived first in a controlled test.
+        if (reservation.state != DeliveryState.RESERVED_QUEUED) return;
+        reservation.state = DeliveryState.COMMITTED;
+        if (reservation.openingThumbnail) thumbnailCommittedForOpen = true;
+    }
+
+    private void onTileWritten(long generation, int deliveryId) {
+        DeliveryReservation reservation = deliveries.get(deliveryId);
+        if (reservation != null
+                && (reservation.state == DeliveryState.COMMITTED
+                    || reservation.state == DeliveryState.RESERVED_QUEUED)) {
+            reservation.state = DeliveryState.WRITTEN_AWAITING_RELEASE;
+        }
+
         ActivePlan plan = activePlan;
         if (plan == null || plan.generation != generation) return;
         plan.busy = false;
@@ -465,14 +528,34 @@ public final class LupaSession implements WebSocketEndpoint {
     }
 
     private void invalidatePlan() {
+        ActivePlan invalidated = activePlan;
         activePlan = null;
         planGeneration++;
+        if (invalidated != null) {
+            cancelUncommittedDeliveries(invalidated.generation);
+        }
+    }
+
+    private void cancelUncommittedDeliveries(long generation) {
+        var iterator = deliveries.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Integer, DeliveryReservation> entry = iterator.next();
+            DeliveryReservation reservation = entry.getValue();
+            if (reservation.planGeneration != generation) continue;
+            WebSocketEndpoint.BinarySend write = reservation.write;
+            if (write == null || !write.cancelIfNotCommitted()) continue;
+
+            reservation.state = DeliveryState.CANCELLED;
+            freeWindowBytes += reservation.reservedBytes;
+            iterator.remove();
+        }
+        enforceCreditInvariant(sender);
     }
 
     private void enforceCreditInvariant(Sender sender) {
         long reserved = 0;
         for (DeliveryReservation reservation : deliveries.values()) {
-            reserved += reservation.reservedBytes();
+            reserved += reservation.reservedBytes;
         }
         if (freeWindowBytes < 0 || freeWindowBytes + reserved != negotiatedWindowBytes) {
             closed.set(true);
@@ -577,5 +660,34 @@ public final class LupaSession implements WebSocketEndpoint {
             TileData tile,
             boolean openingThumbnail) {}
 
-    private record DeliveryReservation(int deliveryId, int epoch, int reservedBytes) {}
+    private enum DeliveryState {
+        RESERVED_QUEUED,
+        COMMITTED,
+        WRITTEN_AWAITING_RELEASE,
+        RELEASED,
+        CANCELLED
+    }
+
+    private static final class DeliveryReservation {
+        private final int deliveryId;
+        private final int epoch;
+        private final long planGeneration;
+        private final int reservedBytes;
+        private final boolean openingThumbnail;
+        private DeliveryState state = DeliveryState.RESERVED_QUEUED;
+        private WebSocketEndpoint.BinarySend write;
+
+        private DeliveryReservation(
+                int deliveryId,
+                int epoch,
+                long planGeneration,
+                int reservedBytes,
+                boolean openingThumbnail) {
+            this.deliveryId = deliveryId;
+            this.epoch = epoch;
+            this.planGeneration = planGeneration;
+            this.reservedBytes = reservedBytes;
+            this.openingThumbnail = openingThumbnail;
+        }
+    }
 }
