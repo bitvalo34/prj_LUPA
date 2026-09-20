@@ -113,6 +113,30 @@ class LupaSessionPolicyTest {
     }
 
     @Test
+    void invalidReleaseStatusClosesWithoutReturningCredit() throws Exception {
+        LupaSession session = new LupaSession(store(), reader(140_000), Runnable::run);
+        Sender sender = new Sender();
+        session.onOpen(sender);
+        hello(session, sender);
+        open(session, sender, 1);
+        session.onText(sender, view(2));
+
+        LupaSession.SessionSnapshot before = session.snapshotForTest();
+        assertTrue(before.pendingDeliveries() > 0);
+
+        int delivery = deliveryId(sender.binaries.getFirst());
+        session.onText(sender,
+                "{\"type\":\"RELEASE\",\"deliveryId\":" + delivery
+                        + ",\"status\":\"invalid\"}");
+
+        assertEquals(1008, sender.closeCode);
+        LupaSession.SessionSnapshot after = session.snapshotForTest();
+        assertEquals(before.freeWindowBytes(), after.freeWindowBytes(),
+                "invalid RELEASE must not manufacture credit before the transport closes");
+        assertEquals(before.reservedBytes(), after.reservedBytes());
+    }
+
+    @Test
     void maxEpochIsAcceptedWithoutOverflowAndRepeatedMaxEpochCreatesNoWork() throws Exception {
         LupaSession session = new LupaSession(store(), reader(1024), Runnable::run);
         Sender sender = new Sender();
