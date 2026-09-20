@@ -1,5 +1,5 @@
-import type { Manifest, TileHeader, ViewLayout } from '../protocol/types';
-import { tileDestination } from '../protocol/viewMath';
+import type { FocusPoint, Manifest, TileHeader, ViewLayout } from '../protocol/types';
+import { tileDestination, type ViewRect } from '../protocol/viewMath';
 
 interface BitmapEntry {
   key: string;
@@ -18,15 +18,19 @@ export class CanvasCompositor {
   private readonly entries = new Map<string, BitmapEntry>();
   private frame = 0;
   private currentEpoch = 0;
+  private viewRect: ViewRect | null = null;
+  private focus: FocusPoint | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly onRemoved: (kind: 'context' | 'detail', bytes: number) => void
   ) {}
 
-  startImage(manifest: Manifest, layout: ViewLayout): void {
+  startImage(manifest: Manifest, layout: ViewLayout, viewRect: ViewRect, focus: FocusPoint | null): void {
     this.reset();
     this.manifest = manifest;
+    this.viewRect = { ...viewRect };
+    this.focus = focus ? { ...focus } : null;
     this.setLayout(layout);
   }
 
@@ -39,10 +43,18 @@ export class CanvasCompositor {
     this.schedulePaint();
   }
 
-  beginEpoch(epoch: number): void {
+  setView(viewRect: ViewRect, focus: FocusPoint | null): void {
+    this.viewRect = { ...viewRect };
+    this.focus = focus ? { ...focus } : null;
+    this.schedulePaint();
+  }
+
+  beginEpoch(epoch: number, viewRect: ViewRect, focus: FocusPoint | null): void {
     this.currentEpoch = epoch;
+    this.viewRect = { ...viewRect };
+    this.focus = focus ? { ...focus } : null;
     for (const [key, entry] of this.entries) {
-      if (entry.kind === 'detail') {
+      if (entry.header.z !== 0) {
         if (!entry.presented) entry.onDiscarded();
         entry.bitmap.close();
         this.entries.delete(key);
@@ -56,6 +68,7 @@ export class CanvasCompositor {
     header: TileHeader,
     bitmap: ImageBitmap,
     bytes: number,
+    kind: 'context' | 'detail',
     onPresented: () => void,
     onDiscarded: () => void
   ): boolean {
@@ -79,7 +92,7 @@ export class CanvasCompositor {
       header,
       bitmap,
       bytes,
-      kind: header.z === 0 ? 'context' : 'detail',
+      kind,
       presented: false,
       onPresented,
       onDiscarded
@@ -99,6 +112,8 @@ export class CanvasCompositor {
     this.entries.clear();
     this.manifest = null;
     this.layout = null;
+    this.viewRect = null;
+    this.focus = null;
     this.currentEpoch = 0;
     const context = this.canvas.getContext('2d');
     context?.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -129,8 +144,9 @@ export class CanvasCompositor {
   private paint(): void {
     const manifest = this.manifest;
     const layout = this.layout;
+    const viewRect = this.viewRect;
     const context = this.canvas.getContext('2d', { alpha: false });
-    if (!manifest || !layout || !context) return;
+    if (!manifest || !layout || !viewRect || !context) return;
 
     context.save();
     context.imageSmoothingEnabled = true;
@@ -155,7 +171,7 @@ export class CanvasCompositor {
     context.clip();
 
     for (const entry of entries) {
-      const destination = tileDestination(manifest, layout, entry.header);
+      const destination = tileDestination(manifest, layout, entry.header, viewRect);
       context.drawImage(
         entry.bitmap,
         destination.x,
@@ -168,6 +184,35 @@ export class CanvasCompositor {
         entry.onPresented();
       }
     }
+
+    this.paintFocus(context, layout, viewRect);
+    context.restore();
+  }
+
+  private paintFocus(context: CanvasRenderingContext2D, layout: ViewLayout, viewRect: ViewRect): void {
+    const focus = this.focus;
+    if (!focus) return;
+    if (
+      focus.x < viewRect.x || focus.y < viewRect.y ||
+      focus.x > viewRect.x + viewRect.width || focus.y > viewRect.y + viewRect.height
+    ) return;
+
+    const x = layout.imageRectPx.x + ((focus.x - viewRect.x) / viewRect.width) * layout.imageRectPx.width;
+    const y = layout.imageRectPx.y + ((focus.y - viewRect.y) / viewRect.height) * layout.imageRectPx.height;
+    context.save();
+    context.strokeStyle = 'rgba(245, 218, 108, 0.95)';
+    context.lineWidth = Math.max(2, layout.effectiveDpr * 1.5);
+    context.setLineDash([8 * layout.effectiveDpr, 5 * layout.effectiveDpr]);
+    context.beginPath();
+    context.arc(x, y, focus.radiusPx, 0, Math.PI * 2);
+    context.stroke();
+    context.setLineDash([]);
+    context.beginPath();
+    context.moveTo(x - 7 * layout.effectiveDpr, y);
+    context.lineTo(x + 7 * layout.effectiveDpr, y);
+    context.moveTo(x, y - 7 * layout.effectiveDpr);
+    context.lineTo(x, y + 7 * layout.effectiveDpr);
+    context.stroke();
     context.restore();
   }
 }

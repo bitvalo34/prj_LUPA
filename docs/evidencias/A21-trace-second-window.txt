@@ -1,0 +1,160 @@
+2026-09-20T05:38:03.305Z	OUT	RELEASE	deliveryId=155 status=displayed
+2026-09-20T05:38:03.311Z	IN	TILE	delivery=157 epoch=16 z=3 x=3 y=1 w=256 h=256 jpeg=21595
+2026-09-20T05:38:03.314Z	OUT	RELEASE	deliveryId=156 status=displayed
+2026-09-20T05:38:03.319Z	IN	TILE	delivery=158 epoch=16 z=3 x=4 y=1 w=226 h=256 jpeg=17905
+2026-09-20T05:38:03.319Z	IN	DONE	epoch=16 sentTiles=6
+2026-09-20T05:38:03.319Z	LOCAL	DONE_STATE	decode=2 pintura=0
+2026-09-20T05:38:03.329Z	OUT	RELEASE	deliveryId=157 status=displayed
+2026-09-20T05:38:03.329Z	OUT	RELEASE	deliveryId=158 status=displayed
+2026-09-20T05:38:03.396Z	OUT	VIEW	epoch=17 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=21501,0,16384,12342 viewport=732x551
+2026-09-20T05:38:03.400Z	IN	PLAN	epoch=17 appliedLevel=3 contextLevel=3
+2026-09-20T05:38:03.400Z	IN	TILE	delivery=159 epoch=17 z=3 x=2 y=0 w=256 h=256 jpeg=19188
+2026-09-20T05:38:03.401Z	IN	TILE	delivery=160 epoch=17 z=3 x=3 y=0 w=256 h=256 jpeg=19279
+2026-09-20T05:38:03.402Z	IN	TILE	delivery=161 epoch=17 z=3 x=4 y=0 w=226 h=256 jpeg=16474
+2026-09-20T05:38:03.403Z	IN	TILE	delivery=162 epoch=17 z=3 x=2 y=1 w=256 h=256 jpeg=22883
+2026-09-20T05:38:03.404Z	IN	TILE	delivery=163 epoch=17 z=3 x=3 y=1 w=256 h=256 jpeg=21595
+2026-09-20T05:38:03.408Z	OUT	RELEASE	deliveryId=159 status=displayed
+2026-09-20T05:38:03.408Z	OUT	RELEASE	deliveryId=160 status=displayed
+2026-09-20T05:38:03.408Z	OUT	RELEASE	deliveryId=161 status=displayed
+2026-09-20T05:38:03.408Z	OUT	RELEASE	deliveryId=162 status=displayed
+2026-09-20T05:38:03.414Z	IN	TILE	delivery=164 epoch=17 z=3 x=4 y=1 w=226 h=256 jpeg=17905
+2026-09-20T05:38:03.416Z	OUT	RELEASE	deliveryId=163 status=displayed
+2026-09-20T05:38:03.423Z	IN	DONE	epoch=17 sentTiles=6
+2026-09-20T05:38:03.423Z	LOCAL	DONE_STATE	decode=1 pintura=0
+2026-09-20T05:38:03.428Z	OUT	RELEASE	deliveryId=164 status=displayed
+2026-09-20T05:38:03.497Z	OUT	VIEW	epoch=18 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=22711,0,16384,12342 viewport=732x551
+2026-09-20T05:38:03.499Z	IN	PLAN	epoch=18 appliedLevel=3 contextLevel=3
+2026-09-20T05:38:03.499Z	IN	TILE	delivery=165 epoch=18 z=3 x=2 y=0 w=256 h=256 jpeg=19188
+2026-09-20T05:38:03.500Z	IN	TILE	delivery=166 epoch=18 z=3 x=3 y=0 w=256 h=256 jpeg=19279
+2026-09-20T05:38:03.502Z	IN	TILE	delivery=167 epoch=18 z=3 x=4 y=0 w=226 h=256 jpeg=16474
+2026-09-20T05:38:03.503Z	IN	TILE	delivery=168 epoch=18 z=3 x=2 y=1 w=256 h=256 jpeg=22883
+2026-09-20T05:38:03.506Z	OUT	RELEASE	deliveryId=165 status=displayed
+2026-09-20T05:38:03.506Z	OUT	RELEASE	deliveryId=166 status=displayed
+2026-09-20T05:38:03.506Z	OUT	RELEASE	deliveryId=167 status=displayed
+2026-09-20T05:38:03.511Z	IN	TILE	delivery=169 epoch=18 z=3 x=3 y=1 w=256 h=256 jpeg=21595
+2026-09-20T05:38:03.513Z	IN	TILE	delivery=170 epoch=18 z=3 x=4 y=1 w=226 h=256 jpeg=17905
+2026-09-20T05:38:03.513Z	IN	DONE	epoch=18 sentTiles=6
+2026-09-20T05:38:03.513Z	LOCAL	DONE_STATE	decode=2 pintura=1
+2026-09-20T05:38:03.516Z	OUT	RELEASE	deliveryId=168 status=displayed
+2026-09-20T05:38:03.529Z	OUT	RELEASE	deliveryId=169 status=displayed
+2026-09-20T05:38:03.529Z	OUT	RELEASE	deliveryId=170 status=displayed
+2026-09-20T05:38:03.597Z	OUT	VIEW	epoch=19 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=23616,0,16384,12342 viewport=732x551
+2026-09-20T05:38:03.599Z	IN	PLAN	epoch=19 appliedLevel=3 contextLevel=3
+2026-09-20T05:38:03.601Z	IN	TILE	delivery=171 epoch=19 z=3 x=2 y=0 w=256 h=256 jpeg=19188
+2026-09-20T05:38:03.602Z	IN	TILE	delivery=172 epoch=19 z=3 x=3 y=0 w=256 h=256 jpeg=19279
+2026-09-20T05:38:03.603Z	IN	TILE	delivery=173 epoch=19 z=3 x=4 y=0 w=226 h=256 jpeg=16474
+2026-09-20T05:38:03.605Z	IN	TILE	delivery=174 epoch=19 z=3 x=2 y=1 w=256 h=256 jpeg=22883
+2026-09-20T05:38:03.607Z	IN	TILE	delivery=175 epoch=19 z=3 x=3 y=1 w=256 h=256 jpeg=21595
+2026-09-20T05:38:03.610Z	OUT	RELEASE	deliveryId=171 status=displayed
+2026-09-20T05:38:03.610Z	OUT	RELEASE	deliveryId=172 status=displayed
+2026-09-20T05:38:03.610Z	OUT	RELEASE	deliveryId=173 status=displayed
+2026-09-20T05:38:03.610Z	OUT	RELEASE	deliveryId=174 status=displayed
+2026-09-20T05:38:03.615Z	IN	TILE	delivery=176 epoch=19 z=3 x=4 y=1 w=226 h=256 jpeg=17905
+2026-09-20T05:38:03.619Z	OUT	RELEASE	deliveryId=175 status=displayed
+2026-09-20T05:38:03.625Z	IN	DONE	epoch=19 sentTiles=6
+2026-09-20T05:38:03.625Z	LOCAL	DONE_STATE	decode=1 pintura=0
+2026-09-20T05:38:03.633Z	OUT	RELEASE	deliveryId=176 status=displayed
+2026-09-20T05:38:03.912Z	OUT	VIEW	epoch=20 imageId=adrian-prueba imageVersion=v1 detailOffset=0 mode=uniform rect=23616,0,16384,12342 viewport=732x551
+2026-09-20T05:38:03.913Z	IN	PLAN	epoch=20 appliedLevel=4 contextLevel=4
+2026-09-20T05:38:03.915Z	IN	TILE	delivery=177 epoch=20 z=4 x=5 y=0 w=256 h=256 jpeg=23769
+2026-09-20T05:38:03.916Z	IN	TILE	delivery=178 epoch=20 z=4 x=6 y=0 w=256 h=256 jpeg=24026
+2026-09-20T05:38:03.917Z	OUT	RELEASE	deliveryId=177 status=displayed
+2026-09-20T05:38:03.921Z	IN	TILE	delivery=179 epoch=20 z=4 x=7 y=0 w=256 h=256 jpeg=23324
+2026-09-20T05:38:03.921Z	IN	TILE	delivery=180 epoch=20 z=4 x=8 y=0 w=256 h=256 jpeg=22441
+2026-09-20T05:38:03.921Z	IN	TILE	delivery=181 epoch=20 z=4 x=9 y=0 w=196 h=256 jpeg=16959
+2026-09-20T05:38:03.921Z	IN	TILE	delivery=182 epoch=20 z=4 x=5 y=1 w=256 h=256 jpeg=25346
+2026-09-20T05:38:03.922Z	IN	TILE	delivery=183 epoch=20 z=4 x=6 y=1 w=256 h=256 jpeg=25074
+2026-09-20T05:38:03.923Z	IN	TILE	delivery=184 epoch=20 z=4 x=7 y=1 w=256 h=256 jpeg=23872
+2026-09-20T05:38:03.924Z	OUT	RELEASE	deliveryId=178 status=displayed
+2026-09-20T05:38:03.926Z	IN	TILE	delivery=185 epoch=20 z=4 x=8 y=1 w=256 h=256 jpeg=22361
+2026-09-20T05:38:03.928Z	IN	TILE	delivery=186 epoch=20 z=4 x=9 y=1 w=196 h=256 jpeg=16774
+2026-09-20T05:38:03.929Z	IN	TILE	delivery=187 epoch=20 z=4 x=5 y=2 w=256 h=256 jpeg=25889
+2026-09-20T05:38:03.930Z	IN	TILE	delivery=188 epoch=20 z=4 x=6 y=2 w=256 h=256 jpeg=25042
+2026-09-20T05:38:03.931Z	IN	TILE	delivery=189 epoch=20 z=4 x=7 y=2 w=256 h=256 jpeg=24837
+2026-09-20T05:38:03.932Z	IN	TILE	delivery=190 epoch=20 z=4 x=8 y=2 w=256 h=256 jpeg=22317
+2026-09-20T05:38:03.934Z	IN	TILE	delivery=191 epoch=20 z=4 x=9 y=2 w=196 h=256 jpeg=16990
+2026-09-20T05:38:03.935Z	IN	TILE	delivery=192 epoch=20 z=4 x=5 y=3 w=256 h=256 jpeg=26174
+2026-09-20T05:38:03.936Z	IN	TILE	delivery=193 epoch=20 z=4 x=6 y=3 w=256 h=256 jpeg=25713
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=179 status=displayed
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=180 status=displayed
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=181 status=displayed
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=182 status=displayed
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=183 status=displayed
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=184 status=displayed
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=185 status=displayed
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=186 status=displayed
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=187 status=displayed
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=188 status=displayed
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=189 status=displayed
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=190 status=displayed
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=191 status=displayed
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=192 status=displayed
+2026-09-20T05:38:03.939Z	OUT	RELEASE	deliveryId=193 status=displayed
+2026-09-20T05:38:03.944Z	IN	TILE	delivery=194 epoch=20 z=4 x=7 y=3 w=256 h=256 jpeg=25248
+2026-09-20T05:38:03.944Z	IN	TILE	delivery=195 epoch=20 z=4 x=8 y=3 w=256 h=256 jpeg=23768
+2026-09-20T05:38:03.944Z	IN	TILE	delivery=196 epoch=20 z=4 x=9 y=3 w=196 h=256 jpeg=18203
+2026-09-20T05:38:03.944Z	IN	DONE	epoch=20 sentTiles=20
+2026-09-20T05:38:03.944Z	LOCAL	DONE_STATE	decode=3 pintura=0
+2026-09-20T05:38:03.951Z	OUT	RELEASE	deliveryId=194 status=displayed
+2026-09-20T05:38:03.951Z	OUT	RELEASE	deliveryId=195 status=displayed
+2026-09-20T05:38:03.957Z	OUT	RELEASE	deliveryId=196 status=displayed
+2026-09-20T05:38:04.480Z	OUT	VIEW	epoch=21 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=23616,0,16384,12342 viewport=732x551
+2026-09-20T05:38:04.484Z	IN	PLAN	epoch=21 appliedLevel=3 contextLevel=3
+2026-09-20T05:38:04.485Z	IN	TILE	delivery=197 epoch=21 z=3 x=2 y=0 w=256 h=256 jpeg=19188
+2026-09-20T05:38:04.488Z	IN	TILE	delivery=198 epoch=21 z=3 x=3 y=0 w=256 h=256 jpeg=19279
+2026-09-20T05:38:04.490Z	IN	TILE	delivery=199 epoch=21 z=3 x=4 y=0 w=226 h=256 jpeg=16474
+2026-09-20T05:38:04.491Z	IN	TILE	delivery=200 epoch=21 z=3 x=2 y=1 w=256 h=256 jpeg=22883
+2026-09-20T05:38:04.493Z	IN	TILE	delivery=201 epoch=21 z=3 x=3 y=1 w=256 h=256 jpeg=21595
+2026-09-20T05:38:04.493Z	IN	TILE	delivery=202 epoch=21 z=3 x=4 y=1 w=226 h=256 jpeg=17905
+2026-09-20T05:38:04.495Z	OUT	RELEASE	deliveryId=197 status=displayed
+2026-09-20T05:38:04.495Z	OUT	RELEASE	deliveryId=198 status=displayed
+2026-09-20T05:38:04.495Z	OUT	RELEASE	deliveryId=199 status=displayed
+2026-09-20T05:38:04.496Z	OUT	RELEASE	deliveryId=200 status=displayed
+2026-09-20T05:38:04.507Z	IN	DONE	epoch=21 sentTiles=6
+2026-09-20T05:38:04.507Z	LOCAL	DONE_STATE	decode=2 pintura=0
+2026-09-20T05:38:04.521Z	OUT	RELEASE	deliveryId=201 status=displayed
+2026-09-20T05:38:04.521Z	OUT	RELEASE	deliveryId=202 status=displayed
+2026-09-20T05:38:05.056Z	OUT	VIEW	epoch=22 imageId=adrian-prueba imageVersion=v1 detailOffset=0 mode=uniform rect=23616,0,16384,12342 viewport=732x551
+2026-09-20T05:38:05.057Z	IN	PLAN	epoch=22 appliedLevel=4 contextLevel=4
+2026-09-20T05:38:05.059Z	IN	TILE	delivery=203 epoch=22 z=4 x=5 y=0 w=256 h=256 jpeg=23769
+2026-09-20T05:38:05.060Z	IN	TILE	delivery=204 epoch=22 z=4 x=6 y=0 w=256 h=256 jpeg=24026
+2026-09-20T05:38:05.063Z	OUT	RELEASE	deliveryId=203 status=displayed
+2026-09-20T05:38:05.063Z	OUT	RELEASE	deliveryId=204 status=displayed
+2026-09-20T05:38:05.068Z	IN	TILE	delivery=205 epoch=22 z=4 x=7 y=0 w=256 h=256 jpeg=23324
+2026-09-20T05:38:05.068Z	IN	TILE	delivery=206 epoch=22 z=4 x=8 y=0 w=256 h=256 jpeg=22441
+2026-09-20T05:38:05.068Z	IN	TILE	delivery=207 epoch=22 z=4 x=9 y=0 w=196 h=256 jpeg=16959
+2026-09-20T05:38:05.069Z	IN	TILE	delivery=208 epoch=22 z=4 x=5 y=1 w=256 h=256 jpeg=25346
+2026-09-20T05:38:05.069Z	IN	TILE	delivery=209 epoch=22 z=4 x=6 y=1 w=256 h=256 jpeg=25074
+2026-09-20T05:38:05.069Z	IN	TILE	delivery=210 epoch=22 z=4 x=7 y=1 w=256 h=256 jpeg=23872
+2026-09-20T05:38:05.071Z	IN	TILE	delivery=211 epoch=22 z=4 x=8 y=1 w=256 h=256 jpeg=22361
+2026-09-20T05:38:05.071Z	IN	TILE	delivery=212 epoch=22 z=4 x=9 y=1 w=196 h=256 jpeg=16774
+2026-09-20T05:38:05.074Z	IN	TILE	delivery=213 epoch=22 z=4 x=5 y=2 w=256 h=256 jpeg=25889
+2026-09-20T05:38:05.075Z	IN	TILE	delivery=214 epoch=22 z=4 x=6 y=2 w=256 h=256 jpeg=25042
+2026-09-20T05:38:05.076Z	IN	TILE	delivery=215 epoch=22 z=4 x=7 y=2 w=256 h=256 jpeg=24837
+2026-09-20T05:38:05.077Z	IN	TILE	delivery=216 epoch=22 z=4 x=8 y=2 w=256 h=256 jpeg=22317
+2026-09-20T05:38:05.078Z	OUT	RELEASE	deliveryId=205 status=displayed
+2026-09-20T05:38:05.078Z	OUT	RELEASE	deliveryId=206 status=displayed
+2026-09-20T05:38:05.079Z	OUT	RELEASE	deliveryId=207 status=displayed
+2026-09-20T05:38:05.079Z	OUT	RELEASE	deliveryId=208 status=displayed
+2026-09-20T05:38:05.079Z	OUT	RELEASE	deliveryId=209 status=displayed
+2026-09-20T05:38:05.079Z	OUT	RELEASE	deliveryId=210 status=displayed
+2026-09-20T05:38:05.079Z	OUT	RELEASE	deliveryId=211 status=displayed
+2026-09-20T05:38:05.079Z	OUT	RELEASE	deliveryId=212 status=displayed
+2026-09-20T05:38:05.083Z	IN	TILE	delivery=217 epoch=22 z=4 x=9 y=2 w=196 h=256 jpeg=16990
+2026-09-20T05:38:05.083Z	IN	TILE	delivery=218 epoch=22 z=4 x=5 y=3 w=256 h=256 jpeg=26174
+2026-09-20T05:38:05.083Z	IN	TILE	delivery=219 epoch=22 z=4 x=6 y=3 w=256 h=256 jpeg=25713
+2026-09-20T05:38:05.084Z	IN	TILE	delivery=220 epoch=22 z=4 x=7 y=3 w=256 h=256 jpeg=25248
+2026-09-20T05:38:05.084Z	IN	TILE	delivery=221 epoch=22 z=4 x=8 y=3 w=256 h=256 jpeg=23768
+2026-09-20T05:38:05.085Z	IN	TILE	delivery=222 epoch=22 z=4 x=9 y=3 w=196 h=256 jpeg=18203
+2026-09-20T05:38:05.085Z	IN	DONE	epoch=22 sentTiles=20
+2026-09-20T05:38:05.085Z	LOCAL	DONE_STATE	decode=5 pintura=5
+2026-09-20T05:38:05.090Z	OUT	RELEASE	deliveryId=213 status=displayed
+2026-09-20T05:38:05.090Z	OUT	RELEASE	deliveryId=214 status=displayed
+2026-09-20T05:38:05.090Z	OUT	RELEASE	deliveryId=215 status=displayed
+2026-09-20T05:38:05.090Z	OUT	RELEASE	deliveryId=216 status=displayed
+2026-09-20T05:38:05.090Z	OUT	RELEASE	deliveryId=217 status=displayed
+2026-09-20T05:38:05.090Z	OUT	RELEASE	deliveryId=218 status=displayed
+2026-09-20T05:38:05.090Z	OUT	RELEASE	deliveryId=219 status=displayed
+2026-09-20T05:38:05.090Z	OUT	RELEASE	deliveryId=220 status=displayed
+2026-09-20T05:38:05.090Z	OUT	RELEASE	deliveryId=221 status=displayed
+2026-09-20T05:38:05.090Z	OUT	RELEASE	deliveryId=222 status=displayed

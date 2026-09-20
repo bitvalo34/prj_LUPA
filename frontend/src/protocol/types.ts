@@ -54,6 +54,14 @@ export interface Plan {
   contextLevel: number;
 }
 
+export type ViewMode = 'uniform' | 'focus';
+
+export interface FocusPoint {
+  x: number;
+  y: number;
+  radiusPx: number;
+}
+
 export interface Done {
   type: 'DONE';
   epoch: number;

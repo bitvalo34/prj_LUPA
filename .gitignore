@@ -1,6 +1,8 @@
 # Maven / Java
 /target/
 *.class
+/frontend/node_modules/
+/frontend/*.tsbuildinfo
 
 # IDE
 .idea/

@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type WheelEvent
+} from 'react';
 import type { Catalog, CatalogImage } from '../protocol/types';
 import { loadCatalog } from '../runtime/catalog';
 import { LupaClient, type ClientSnapshot } from '../runtime/LupaClient';
@@ -23,6 +32,10 @@ const INITIAL_SNAPSHOT: ClientSnapshot = {
   doneSentTiles: null,
   managedBitmapBytes: 0,
   activeViewRect: null,
+  viewMode: 'uniform',
+  detailOffset: 0,
+  focus: null,
+  zoom: 1,
   error: null,
   trace: []
 };
@@ -43,6 +56,14 @@ export function App() {
   const stageRef = useRef<HTMLDivElement>(null);
   const catalogRequestRef = useRef(0);
   const catalogAbortRef = useRef<AbortController | null>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    lastX: number;
+    lastY: number;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  } | null>(null);
   const [snapshot, setSnapshot] = useState<ClientSnapshot>(INITIAL_SNAPSHOT);
   const [catalog, setCatalog] = useState<Catalog | null>(sampleMode ? SAMPLE_CATALOG : null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
@@ -113,6 +134,80 @@ export function App() {
 
   function selectImage(image: CatalogImage) {
     client?.selectImage(image);
+  }
+
+  function stagePoint(event: { clientX: number; clientY: number }): { x: number; y: number } | null {
+    const stage = stageRef.current;
+    if (!stage) return null;
+    const bounds = stage.getBoundingClientRect();
+    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+  }
+
+  function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!client || !snapshot.manifest || event.button !== 0) return;
+    const point = stagePoint(event);
+    if (!point) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      lastX: point.x,
+      lastY: point.y,
+      startX: point.x,
+      startY: point.y,
+      moved: false
+    };
+    event.currentTarget.classList.add('dragging');
+  }
+
+  function onPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!client || !drag || drag.pointerId !== event.pointerId) return;
+    const point = stagePoint(event);
+    if (!point) return;
+    const dx = point.x - drag.lastX;
+    const dy = point.y - drag.lastY;
+    if (Math.hypot(point.x - drag.startX, point.y - drag.startY) > 4) drag.moved = true;
+    drag.lastX = point.x;
+    drag.lastY = point.y;
+    if (drag.moved) client.panByCss(dx, dy);
+  }
+
+  function finishPointer(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!client || !drag || drag.pointerId !== event.pointerId) return;
+    const point = stagePoint(event);
+    if (!drag.moved && point && snapshot.viewMode === 'focus') client.focusAtCss(point.x, point.y);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    event.currentTarget.classList.remove('dragging');
+    dragRef.current = null;
+  }
+
+  function onWheel(event: WheelEvent<HTMLDivElement>) {
+    if (!client || !snapshot.manifest) return;
+    event.preventDefault();
+    const point = stagePoint(event);
+    if (!point) return;
+    client.zoomAtCss(point.x, point.y, event.deltaY < 0 ? 0.8 : 1.25);
+  }
+
+  function onStageKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (!client || !snapshot.manifest) return;
+    const actions: Record<string, () => void> = {
+      ArrowLeft: () => client.panByFraction(-0.1, 0),
+      ArrowRight: () => client.panByFraction(0.1, 0),
+      ArrowUp: () => client.panByFraction(0, -0.1),
+      ArrowDown: () => client.panByFraction(0, 0.1),
+      '+': () => client.zoomBy(0.8),
+      '=': () => client.zoomBy(0.8),
+      '-': () => client.zoomBy(1.25),
+      '0': () => client.resetView()
+    };
+    const action = actions[event.key];
+    if (!action) return;
+    event.preventDefault();
+    action();
   }
 
   return (
@@ -188,7 +283,18 @@ export function App() {
               <div className="bezel-lights" aria-hidden="true"><i/><i/><i/></div>
             </div>
             <div className="screen-wrap">
-              <div className="screen-stage" ref={stageRef}>
+              <div
+                className={'screen-stage ' + (snapshot.manifest ? 'interactive' : '')}
+                ref={stageRef}
+                tabIndex={snapshot.manifest ? 0 : -1}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={finishPointer}
+                onPointerCancel={finishPointer}
+                onWheel={onWheel}
+                onKeyDown={onStageKeyDown}
+                aria-label="Visor navegable. Arrastra para desplazar, usa la rueda para acercar o alejar y las flechas para mover la vista."
+              >
                 <canvas ref={canvasRef} aria-label="Imagen científica compuesta progresivamente" />
                 {!snapshot.manifest && (
                   <div className="screen-idle">
@@ -207,6 +313,7 @@ export function App() {
             </div>
             <div className="viewer-controls">
               <StatusReadout snapshot={snapshot} />
+              <NavigationControls client={client} snapshot={snapshot} />
             </div>
           </div>
         </section>
@@ -221,6 +328,9 @@ export function App() {
           </div>
           <Metric label="Conexión" value={'#' + snapshot.connectionId} />
           <Metric label="Época" value={String(snapshot.activeEpoch || '—')} />
+          <Metric label="Modo" value={snapshot.viewMode === 'focus' ? 'Lente' : 'Uniforme'} />
+          <Metric label="Detalle" value={String(snapshot.detailOffset)} />
+          <Metric label="Zoom" value={snapshot.zoom.toFixed(2) + '×'} />
           <Metric label="TILE recibidos" value={String(snapshot.receivedTiles)} />
           <Metric label="Dibujados" value={String(snapshot.drawnTiles)} />
           <Metric label="Descartados" value={String(snapshot.discardedTiles)} />
@@ -230,22 +340,7 @@ export function App() {
           <Metric label="Bitmaps LUPA" value={formatBytes(snapshot.managedBitmapBytes)} />
           <Metric label="Región VIEW" value={formatRect(snapshot.activeViewRect)} />
           <p className="memory-note">Memoria administrada por LUPA; no representa toda la RAM/GPU del navegador.</p>
-
-          <button
-            className="console-button secondary"
-            onClick={() => client?.requestCenteredIntegrationRegion()}
-            disabled={!client || !snapshot.manifest}
-            title="Utilidad de integración I20; no es navegación A21"
-          >
-            Probar región central I20
-          </button>
-          <button
-            className="console-button secondary"
-            onClick={() => client?.requestFullView()}
-            disabled={!client || !snapshot.manifest}
-          >
-            Restaurar vista completa
-          </button>
+          {snapshot.error && snapshot.phase !== 'error' && <p className="recoverable-error" role="status">{snapshot.error}</p>}
           <button
             className="console-button secondary"
             onClick={() => setDiagnosticsOpen((value) => !value)}
@@ -356,6 +451,76 @@ function StatusReadout({ snapshot }: { snapshot: ClientSnapshot }) {
   );
 }
 
+function NavigationControls({
+  client,
+  snapshot
+}: {
+  client: LupaClient | null;
+  snapshot: ClientSnapshot;
+}) {
+  const disabled = !client || !snapshot.manifest;
+  return (
+    <div className="navigation-console" aria-label="Controles de navegación y resolución">
+      <div className="navigation-group">
+        <span>Vista</span>
+        <button
+          className={snapshot.viewMode === 'uniform' ? 'active' : ''}
+          onClick={() => client?.setViewMode('uniform')}
+          aria-pressed={snapshot.viewMode === 'uniform'}
+          disabled={disabled}
+        >Uniforme</button>
+        <button
+          className={snapshot.viewMode === 'focus' ? 'active' : ''}
+          onClick={() => client?.setViewMode('focus')}
+          aria-pressed={snapshot.viewMode === 'focus'}
+          disabled={disabled}
+        >Lente</button>
+      </div>
+
+      <div className="navigation-group detail-selector">
+        <span>Detalle</span>
+        {([-2, -1, 0] as const).map((offset) => (
+          <button
+            key={offset}
+            className={snapshot.detailOffset === offset ? 'active' : ''}
+            onClick={() => client?.setDetailOffset(offset)}
+            aria-pressed={snapshot.detailOffset === offset}
+            disabled={disabled}
+            title={offset === 0 ? 'Detalle máximo solicitado' : 'Reduce el nivel solicitado'}
+          >{offset}</button>
+        ))}
+      </div>
+
+      <div className="navigation-group zoom-controls">
+        <span>Zoom {snapshot.zoom.toFixed(2)}×</span>
+        <button onClick={() => client?.zoomBy(1.25)} disabled={disabled} aria-label="Alejar">−</button>
+        <button onClick={() => client?.zoomBy(0.8)} disabled={disabled} aria-label="Acercar">+</button>
+        <button onClick={() => client?.resetView()} disabled={disabled}>Restablecer</button>
+      </div>
+
+      {snapshot.viewMode === 'focus' && (
+        <label className="focus-radius">
+          <span>Radio {snapshot.focus?.radiusPx ?? 144}px</span>
+          <input
+            type="range"
+            min="32"
+            max="512"
+            step="16"
+            value={snapshot.focus?.radiusPx ?? 144}
+            onChange={(event) => client?.setFocusRadius(Number(event.currentTarget.value))}
+            disabled={disabled}
+          />
+        </label>
+      )}
+
+      <p className="navigation-hint">
+        Arrastra para desplazar y usa la rueda para cambiar escala.
+        {snapshot.viewMode === 'focus' ? ' Haz clic para fijar el foco de la lente.' : ''}
+      </p>
+    </div>
+  );
+}
+
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="metric">
@@ -410,5 +575,6 @@ function formatBytes(value: number): string {
 
 function formatRect(rect: ClientSnapshot['activeViewRect']): string {
   if (!rect) return '—';
-  return rect.x + ',' + rect.y + ' ' + rect.width + '×' + rect.height;
+  const concise = (value: number) => Number(value.toFixed(1)).toString();
+  return concise(rect.x) + ',' + concise(rect.y) + ' ' + concise(rect.width) + '×' + concise(rect.height);
 }

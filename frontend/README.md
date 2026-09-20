@@ -29,3 +29,13 @@ http://127.0.0.1:8081/?sample=1
 ```
 
 No existe fallback automático al modo muestra.
+
+## Navegación A21
+
+- Arrastrar o usar las flechas desplaza la región solicitada.
+- La rueda, los botones `+`/`-` y las teclas `+`/`-` cambian la escala.
+- `0` y Restablecer vuelven a la imagen completa.
+- Detalle selecciona `detailOffset=-2`, `-1` o `0`.
+- Lente habilita `mode=focus`; un clic fija el foco y el control deslizante cambia su radio físico.
+
+Cada interacción envía VIEW con una época nueva. El Canvas conserva solo la miniatura entre épocas y cierra los demás bitmaps antes de incorporar el plan nuevo.

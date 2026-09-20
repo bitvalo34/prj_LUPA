@@ -64,8 +64,12 @@ export class SampleTransport implements LupaTransport {
     }
     if (message.type === 'VIEW') {
       const epoch = Number(message.epoch);
-      this.emitText({ type: 'PLAN', epoch, appliedLevel: 1, contextLevel: 1 });
-      void this.emitTiles(epoch);
+      const detailOffset = Number(message.detailOffset);
+      const mode = message.mode === 'focus' ? 'focus' : 'uniform';
+      const appliedLevel = Math.max(0, 1 + detailOffset);
+      const contextLevel = mode === 'focus' ? Math.max(0, appliedLevel - 1) : appliedLevel;
+      this.emitText({ type: 'PLAN', epoch, appliedLevel, contextLevel });
+      void this.emitTiles(epoch, appliedLevel);
       return;
     }
     if (message.type === 'RELEASE') return;
@@ -83,7 +87,7 @@ export class SampleTransport implements LupaTransport {
     queueMicrotask(() => this.handlers?.onText(JSON.stringify(value)));
   }
 
-  private async emitTiles(epoch: number): Promise<void> {
+  private async emitTiles(epoch: number, appliedLevel: number): Promise<void> {
     const [thumb, full, edge] = await Promise.all([
       makeJpeg(256, 192, 11),
       makeJpeg(256, 256, 29),
@@ -91,10 +95,12 @@ export class SampleTransport implements LupaTransport {
     ]);
     const tiles = [
       ...(!this.thumbnailSent ? [{ z: 0, x: 0, y: 0, w: 256, h: 192, payload: thumb }] : []),
-      { z: 1, x: 0, y: 0, w: 256, h: 256, payload: full },
-      { z: 1, x: 1, y: 0, w: 256, h: 256, payload: full.slice(0) },
-      { z: 1, x: 0, y: 1, w: 256, h: 128, payload: edge },
-      { z: 1, x: 1, y: 1, w: 256, h: 128, payload: edge.slice(0) }
+      ...(appliedLevel === 1 ? [
+        { z: 1, x: 0, y: 0, w: 256, h: 256, payload: full },
+        { z: 1, x: 1, y: 0, w: 256, h: 256, payload: full.slice(0) },
+        { z: 1, x: 0, y: 1, w: 256, h: 128, payload: edge },
+        { z: 1, x: 1, y: 1, w: 256, h: 128, payload: edge.slice(0) }
+      ] : [])
     ];
 
     if (!this.thumbnailSent) this.thumbnailSent = true;

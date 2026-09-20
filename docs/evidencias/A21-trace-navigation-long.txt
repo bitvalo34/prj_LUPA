@@ -1,0 +1,160 @@
+2026-09-20T05:34:28.091Z	IN	TILE	delivery=2766 epoch=528 z=8 x=68 y=60 w=256 h=256 jpeg=43625
+2026-09-20T05:34:28.093Z	IN	TILE	delivery=2767 epoch=528 z=8 x=69 y=60 w=256 h=256 jpeg=43526
+2026-09-20T05:34:28.096Z	IN	TILE	delivery=2768 epoch=528 z=8 x=67 y=61 w=256 h=256 jpeg=43194
+2026-09-20T05:34:28.097Z	IN	TILE	delivery=2769 epoch=528 z=8 x=68 y=61 w=256 h=256 jpeg=43415
+2026-09-20T05:34:28.100Z	OUT	RELEASE	deliveryId=2762 status=displayed
+2026-09-20T05:34:28.100Z	OUT	RELEASE	deliveryId=2763 status=displayed
+2026-09-20T05:34:28.100Z	OUT	RELEASE	deliveryId=2764 status=displayed
+2026-09-20T05:34:28.100Z	OUT	RELEASE	deliveryId=2765 status=displayed
+2026-09-20T05:34:28.100Z	OUT	RELEASE	deliveryId=2766 status=displayed
+2026-09-20T05:34:28.100Z	OUT	RELEASE	deliveryId=2767 status=displayed
+2026-09-20T05:34:28.100Z	OUT	RELEASE	deliveryId=2768 status=displayed
+2026-09-20T05:34:28.107Z	IN	TILE	delivery=2770 epoch=528 z=8 x=69 y=61 w=256 h=256 jpeg=42754
+2026-09-20T05:34:28.107Z	IN	DONE	epoch=528 sentTiles=9
+2026-09-20T05:34:28.107Z	LOCAL	DONE_STATE	decode=1 pintura=1
+2026-09-20T05:34:28.119Z	OUT	RELEASE	deliveryId=2769 status=displayed
+2026-09-20T05:34:28.119Z	OUT	RELEASE	deliveryId=2770 status=displayed
+2026-09-20T05:34:28.676Z	OUT	VIEW	epoch=529 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=17241,15353,462,347 viewport=732x551
+2026-09-20T05:34:28.678Z	IN	PLAN	epoch=529 appliedLevel=7 contextLevel=7
+2026-09-20T05:34:28.681Z	IN	TILE	delivery=2771 epoch=529 z=7 x=33 y=29 w=256 h=256 jpeg=41675
+2026-09-20T05:34:28.682Z	IN	TILE	delivery=2772 epoch=529 z=7 x=34 y=29 w=256 h=256 jpeg=41817
+2026-09-20T05:34:28.685Z	IN	TILE	delivery=2773 epoch=529 z=7 x=33 y=30 w=256 h=256 jpeg=41396
+2026-09-20T05:34:28.687Z	IN	TILE	delivery=2774 epoch=529 z=7 x=34 y=30 w=256 h=256 jpeg=41222
+2026-09-20T05:34:28.687Z	IN	DONE	epoch=529 sentTiles=4
+2026-09-20T05:34:28.687Z	LOCAL	DONE_STATE	decode=2 pintura=2
+2026-09-20T05:34:28.692Z	OUT	RELEASE	deliveryId=2771 status=displayed
+2026-09-20T05:34:28.692Z	OUT	RELEASE	deliveryId=2772 status=displayed
+2026-09-20T05:34:28.692Z	OUT	RELEASE	deliveryId=2773 status=displayed
+2026-09-20T05:34:28.692Z	OUT	RELEASE	deliveryId=2774 status=displayed
+2026-09-20T05:34:28.775Z	OUT	VIEW	epoch=530 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=17137,15564,462,347 viewport=732x551
+2026-09-20T05:34:28.778Z	IN	PLAN	epoch=530 appliedLevel=7 contextLevel=7
+2026-09-20T05:34:28.779Z	IN	TILE	delivery=2775 epoch=530 z=7 x=33 y=30 w=256 h=256 jpeg=41396
+2026-09-20T05:34:28.781Z	IN	TILE	delivery=2776 epoch=530 z=7 x=34 y=30 w=256 h=256 jpeg=41222
+2026-09-20T05:34:28.782Z	IN	TILE	delivery=2777 epoch=530 z=7 x=33 y=31 w=256 h=256 jpeg=41094
+2026-09-20T05:34:28.784Z	IN	TILE	delivery=2778 epoch=530 z=7 x=34 y=31 w=256 h=256 jpeg=40939
+2026-09-20T05:34:28.784Z	IN	DONE	epoch=530 sentTiles=4
+2026-09-20T05:34:28.784Z	LOCAL	DONE_STATE	decode=1 pintura=3
+2026-09-20T05:34:28.789Z	OUT	RELEASE	deliveryId=2775 status=displayed
+2026-09-20T05:34:28.789Z	OUT	RELEASE	deliveryId=2776 status=displayed
+2026-09-20T05:34:28.789Z	OUT	RELEASE	deliveryId=2777 status=displayed
+2026-09-20T05:34:28.789Z	OUT	RELEASE	deliveryId=2778 status=displayed
+2026-09-20T05:34:28.878Z	OUT	VIEW	epoch=531 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=17106,15641,462,347 viewport=732x551
+2026-09-20T05:34:28.881Z	IN	PLAN	epoch=531 appliedLevel=7 contextLevel=7
+2026-09-20T05:34:28.882Z	IN	TILE	delivery=2779 epoch=531 z=7 x=33 y=30 w=256 h=256 jpeg=41396
+2026-09-20T05:34:28.883Z	IN	TILE	delivery=2780 epoch=531 z=7 x=34 y=30 w=256 h=256 jpeg=41222
+2026-09-20T05:34:28.885Z	IN	TILE	delivery=2781 epoch=531 z=7 x=33 y=31 w=256 h=256 jpeg=41094
+2026-09-20T05:34:28.887Z	IN	TILE	delivery=2782 epoch=531 z=7 x=34 y=31 w=256 h=256 jpeg=40939
+2026-09-20T05:34:28.887Z	IN	DONE	epoch=531 sentTiles=4
+2026-09-20T05:34:28.887Z	LOCAL	DONE_STATE	decode=1 pintura=3
+2026-09-20T05:34:28.891Z	OUT	RELEASE	deliveryId=2779 status=displayed
+2026-09-20T05:34:28.891Z	OUT	RELEASE	deliveryId=2780 status=displayed
+2026-09-20T05:34:28.891Z	OUT	RELEASE	deliveryId=2781 status=displayed
+2026-09-20T05:34:28.891Z	OUT	RELEASE	deliveryId=2782 status=displayed
+2026-09-20T05:34:28.979Z	OUT	VIEW	epoch=532 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=17103,15688,462,347 viewport=732x551
+2026-09-20T05:34:28.982Z	IN	PLAN	epoch=532 appliedLevel=7 contextLevel=7
+2026-09-20T05:34:28.983Z	IN	TILE	delivery=2783 epoch=532 z=7 x=33 y=30 w=256 h=256 jpeg=41396
+2026-09-20T05:34:28.985Z	IN	TILE	delivery=2784 epoch=532 z=7 x=34 y=30 w=256 h=256 jpeg=41222
+2026-09-20T05:34:28.986Z	IN	TILE	delivery=2785 epoch=532 z=7 x=33 y=31 w=256 h=256 jpeg=41094
+2026-09-20T05:34:28.990Z	OUT	RELEASE	deliveryId=2783 status=displayed
+2026-09-20T05:34:28.990Z	OUT	RELEASE	deliveryId=2784 status=displayed
+2026-09-20T05:34:28.990Z	OUT	RELEASE	deliveryId=2785 status=displayed
+2026-09-20T05:34:28.998Z	IN	TILE	delivery=2786 epoch=532 z=7 x=34 y=31 w=256 h=256 jpeg=40939
+2026-09-20T05:34:28.999Z	IN	DONE	epoch=532 sentTiles=4
+2026-09-20T05:34:28.999Z	LOCAL	DONE_STATE	decode=1 pintura=0
+2026-09-20T05:34:29.005Z	OUT	RELEASE	deliveryId=2786 status=displayed
+2026-09-20T05:34:29.082Z	OUT	VIEW	epoch=533 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=17116,15706,462,347 viewport=732x551
+2026-09-20T05:34:29.085Z	IN	PLAN	epoch=533 appliedLevel=7 contextLevel=7
+2026-09-20T05:34:29.086Z	IN	TILE	delivery=2787 epoch=533 z=7 x=33 y=30 w=256 h=256 jpeg=41396
+2026-09-20T05:34:29.088Z	IN	TILE	delivery=2788 epoch=533 z=7 x=34 y=30 w=256 h=256 jpeg=41222
+2026-09-20T05:34:29.092Z	OUT	RELEASE	deliveryId=2787 status=displayed
+2026-09-20T05:34:29.096Z	IN	TILE	delivery=2789 epoch=533 z=7 x=33 y=31 w=256 h=256 jpeg=41094
+2026-09-20T05:34:29.097Z	IN	TILE	delivery=2790 epoch=533 z=7 x=34 y=31 w=256 h=256 jpeg=40939
+2026-09-20T05:34:29.097Z	IN	DONE	epoch=533 sentTiles=4
+2026-09-20T05:34:29.097Z	LOCAL	DONE_STATE	decode=2 pintura=1
+2026-09-20T05:34:29.101Z	OUT	RELEASE	deliveryId=2788 status=displayed
+2026-09-20T05:34:29.108Z	OUT	RELEASE	deliveryId=2789 status=displayed
+2026-09-20T05:34:29.108Z	OUT	RELEASE	deliveryId=2790 status=displayed
+2026-09-20T05:34:29.186Z	OUT	VIEW	epoch=534 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=17200,15717,462,347 viewport=732x551
+2026-09-20T05:34:29.188Z	IN	PLAN	epoch=534 appliedLevel=7 contextLevel=7
+2026-09-20T05:34:29.189Z	IN	TILE	delivery=2791 epoch=534 z=7 x=33 y=30 w=256 h=256 jpeg=41396
+2026-09-20T05:34:29.192Z	IN	TILE	delivery=2792 epoch=534 z=7 x=34 y=30 w=256 h=256 jpeg=41222
+2026-09-20T05:34:29.194Z	IN	TILE	delivery=2793 epoch=534 z=7 x=33 y=31 w=256 h=256 jpeg=41094
+2026-09-20T05:34:29.196Z	IN	TILE	delivery=2794 epoch=534 z=7 x=34 y=31 w=256 h=256 jpeg=40939
+2026-09-20T05:34:29.196Z	IN	DONE	epoch=534 sentTiles=4
+2026-09-20T05:34:29.196Z	LOCAL	DONE_STATE	decode=1 pintura=3
+2026-09-20T05:34:29.199Z	OUT	RELEASE	deliveryId=2791 status=displayed
+2026-09-20T05:34:29.199Z	OUT	RELEASE	deliveryId=2792 status=displayed
+2026-09-20T05:34:29.200Z	OUT	RELEASE	deliveryId=2793 status=displayed
+2026-09-20T05:34:29.207Z	OUT	RELEASE	deliveryId=2794 status=displayed
+2026-09-20T05:34:29.293Z	OUT	VIEW	epoch=535 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=17289,15681,462,347 viewport=732x551
+2026-09-20T05:34:29.299Z	IN	PLAN	epoch=535 appliedLevel=7 contextLevel=7
+2026-09-20T05:34:29.300Z	IN	TILE	delivery=2795 epoch=535 z=7 x=33 y=30 w=256 h=256 jpeg=41396
+2026-09-20T05:34:29.300Z	IN	TILE	delivery=2796 epoch=535 z=7 x=34 y=30 w=256 h=256 jpeg=41222
+2026-09-20T05:34:29.300Z	IN	TILE	delivery=2797 epoch=535 z=7 x=33 y=31 w=256 h=256 jpeg=41094
+2026-09-20T05:34:29.302Z	IN	TILE	delivery=2798 epoch=535 z=7 x=34 y=31 w=256 h=256 jpeg=40939
+2026-09-20T05:34:29.302Z	IN	DONE	epoch=535 sentTiles=4
+2026-09-20T05:34:29.302Z	LOCAL	DONE_STATE	decode=4 pintura=0
+2026-09-20T05:34:29.308Z	OUT	RELEASE	deliveryId=2795 status=displayed
+2026-09-20T05:34:29.308Z	OUT	RELEASE	deliveryId=2796 status=displayed
+2026-09-20T05:34:29.321Z	OUT	RELEASE	deliveryId=2797 status=displayed
+2026-09-20T05:34:29.321Z	OUT	RELEASE	deliveryId=2798 status=displayed
+2026-09-20T05:34:29.397Z	OUT	VIEW	epoch=536 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=17389,15602,462,347 viewport=732x551
+2026-09-20T05:34:29.403Z	IN	PLAN	epoch=536 appliedLevel=7 contextLevel=7
+2026-09-20T05:34:29.404Z	IN	TILE	delivery=2799 epoch=536 z=7 x=33 y=30 w=256 h=256 jpeg=41396
+2026-09-20T05:34:29.404Z	IN	TILE	delivery=2800 epoch=536 z=7 x=34 y=30 w=256 h=256 jpeg=41222
+2026-09-20T05:34:29.404Z	IN	TILE	delivery=2801 epoch=536 z=7 x=33 y=31 w=256 h=256 jpeg=41094
+2026-09-20T05:34:29.406Z	IN	TILE	delivery=2802 epoch=536 z=7 x=34 y=31 w=256 h=256 jpeg=40939
+2026-09-20T05:34:29.406Z	IN	DONE	epoch=536 sentTiles=4
+2026-09-20T05:34:29.406Z	LOCAL	DONE_STATE	decode=4 pintura=0
+2026-09-20T05:34:29.412Z	OUT	RELEASE	deliveryId=2799 status=displayed
+2026-09-20T05:34:29.412Z	OUT	RELEASE	deliveryId=2800 status=displayed
+2026-09-20T05:34:29.425Z	OUT	RELEASE	deliveryId=2801 status=displayed
+2026-09-20T05:34:29.425Z	OUT	RELEASE	deliveryId=2802 status=displayed
+2026-09-20T05:34:29.497Z	OUT	VIEW	epoch=537 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=17449,15525,462,347 viewport=732x551
+2026-09-20T05:34:29.500Z	IN	PLAN	epoch=537 appliedLevel=7 contextLevel=7
+2026-09-20T05:34:29.500Z	IN	TILE	delivery=2803 epoch=537 z=7 x=34 y=30 w=256 h=256 jpeg=41222
+2026-09-20T05:34:29.502Z	IN	TILE	delivery=2804 epoch=537 z=7 x=34 y=31 w=256 h=256 jpeg=40939
+2026-09-20T05:34:29.502Z	IN	DONE	epoch=537 sentTiles=2
+2026-09-20T05:34:29.502Z	LOCAL	DONE_STATE	decode=1 pintura=1
+2026-09-20T05:34:29.510Z	OUT	RELEASE	deliveryId=2803 status=displayed
+2026-09-20T05:34:29.510Z	OUT	RELEASE	deliveryId=2804 status=displayed
+2026-09-20T05:34:29.598Z	OUT	VIEW	epoch=538 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=17488,15474,462,347 viewport=732x551
+2026-09-20T05:34:29.599Z	IN	PLAN	epoch=538 appliedLevel=7 contextLevel=7
+2026-09-20T05:34:29.601Z	IN	TILE	delivery=2805 epoch=538 z=7 x=34 y=30 w=256 h=256 jpeg=41222
+2026-09-20T05:34:29.606Z	IN	TILE	delivery=2806 epoch=538 z=7 x=35 y=30 w=256 h=256 jpeg=41205
+2026-09-20T05:34:29.607Z	OUT	RELEASE	deliveryId=2805 status=displayed
+2026-09-20T05:34:29.614Z	IN	DONE	epoch=538 sentTiles=2
+2026-09-20T05:34:29.614Z	LOCAL	DONE_STATE	decode=1 pintura=0
+2026-09-20T05:34:29.630Z	OUT	RELEASE	deliveryId=2806 status=displayed
+2026-09-20T05:34:29.702Z	OUT	VIEW	epoch=539 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=17492,15465,462,347 viewport=732x551
+2026-09-20T05:34:29.707Z	IN	PLAN	epoch=539 appliedLevel=7 contextLevel=7
+2026-09-20T05:34:29.708Z	IN	TILE	delivery=2807 epoch=539 z=7 x=34 y=30 w=256 h=256 jpeg=41222
+2026-09-20T05:34:29.708Z	IN	TILE	delivery=2808 epoch=539 z=7 x=35 y=30 w=256 h=256 jpeg=41205
+2026-09-20T05:34:29.708Z	IN	DONE	epoch=539 sentTiles=2
+2026-09-20T05:34:29.708Z	LOCAL	DONE_STATE	decode=2 pintura=0
+2026-09-20T05:34:29.717Z	OUT	RELEASE	deliveryId=2807 status=displayed
+2026-09-20T05:34:29.717Z	OUT	RELEASE	deliveryId=2808 status=displayed
+2026-09-20T05:34:29.807Z	OUT	VIEW	epoch=540 imageId=adrian-prueba imageVersion=v1 detailOffset=-1 mode=uniform rect=17493,15454,462,347 viewport=732x551
+2026-09-20T05:34:29.808Z	IN	PLAN	epoch=540 appliedLevel=7 contextLevel=7
+2026-09-20T05:34:29.811Z	IN	TILE	delivery=2809 epoch=540 z=7 x=34 y=30 w=256 h=256 jpeg=41222
+2026-09-20T05:34:29.813Z	IN	TILE	delivery=2810 epoch=540 z=7 x=35 y=30 w=256 h=256 jpeg=41205
+2026-09-20T05:34:29.813Z	IN	DONE	epoch=540 sentTiles=2
+2026-09-20T05:34:29.813Z	LOCAL	DONE_STATE	decode=2 pintura=0
+2026-09-20T05:34:29.826Z	OUT	RELEASE	deliveryId=2809 status=displayed
+2026-09-20T05:34:29.826Z	OUT	RELEASE	deliveryId=2810 status=displayed
+2026-09-20T05:34:29.918Z	OUT	VIEW	epoch=541 imageId=adrian-prueba imageVersion=v1 detailOffset=0 mode=uniform rect=17493,15454,462,347 viewport=732x551
+2026-09-20T05:34:29.920Z	IN	PLAN	epoch=541 appliedLevel=8 contextLevel=8
+2026-09-20T05:34:29.923Z	IN	TILE	delivery=2811 epoch=541 z=8 x=68 y=60 w=256 h=256 jpeg=43625
+2026-09-20T05:34:29.930Z	IN	TILE	delivery=2812 epoch=541 z=8 x=69 y=60 w=256 h=256 jpeg=43526
+2026-09-20T05:34:29.931Z	IN	TILE	delivery=2813 epoch=541 z=8 x=70 y=60 w=256 h=256 jpeg=43514
+2026-09-20T05:34:29.932Z	IN	TILE	delivery=2814 epoch=541 z=8 x=68 y=61 w=256 h=256 jpeg=43415
+2026-09-20T05:34:29.933Z	IN	TILE	delivery=2815 epoch=541 z=8 x=69 y=61 w=256 h=256 jpeg=42754
+2026-09-20T05:34:29.934Z	OUT	RELEASE	deliveryId=2811 status=displayed
+2026-09-20T05:34:29.936Z	IN	TILE	delivery=2816 epoch=541 z=8 x=70 y=61 w=256 h=256 jpeg=43097
+2026-09-20T05:34:29.936Z	IN	DONE	epoch=541 sentTiles=6
+2026-09-20T05:34:29.936Z	LOCAL	DONE_STATE	decode=2 pintura=3
+2026-09-20T05:34:29.949Z	OUT	RELEASE	deliveryId=2812 status=displayed
+2026-09-20T05:34:29.949Z	OUT	RELEASE	deliveryId=2813 status=displayed
+2026-09-20T05:34:29.949Z	OUT	RELEASE	deliveryId=2814 status=displayed
+2026-09-20T05:34:29.949Z	OUT	RELEASE	deliveryId=2815 status=displayed
+2026-09-20T05:34:29.949Z	OUT	RELEASE	deliveryId=2816 status=displayed
