@@ -218,6 +218,41 @@ class LupaSessionTest {
     }
 
     @Test
+    void openingAnotherImagePreservesWindowAndOldCommittedReservations() throws Exception {
+        PublishedImageStore store = publishedTwoImages();
+        LupaSession session = new LupaSession(store, fakeTileReader(140_000), Runnable::run);
+        CapturingSender sender = new CapturingSender();
+        session.onOpen(sender);
+
+        hello(session, sender, 524288);
+        session.onText(sender, "{\"type\":\"OPEN\",\"epoch\":1,\"imageId\":\"photo\"}");
+        session.onText(sender, view(2));
+
+        LupaSession.SessionSnapshot beforeOpen = session.snapshotForTest();
+        assertEquals(524288, beforeOpen.negotiatedWindowBytes());
+        assertTrue(beforeOpen.pendingDeliveries() > 0);
+        int oldDelivery = header(sender.binaries.getFirst()).path("deliveryId").asInt();
+
+        session.onText(sender, "{\"type\":\"OPEN\",\"epoch\":3,\"imageId\":\"other\"}");
+
+        LupaSession.SessionSnapshot afterOpen = session.snapshotForTest();
+        assertEquals("other", afterOpen.openedImageId());
+        assertEquals(beforeOpen.negotiatedWindowBytes(), afterOpen.negotiatedWindowBytes());
+        assertEquals(beforeOpen.freeWindowBytes(), afterOpen.freeWindowBytes());
+        assertEquals(beforeOpen.reservedBytes(), afterOpen.reservedBytes(),
+                "committed deliveries from the previous image remain reserved");
+
+        session.onText(sender,
+                "{\"type\":\"RELEASE\",\"deliveryId\":" + oldDelivery
+                        + ",\"status\":\"discarded\"}");
+        LupaSession.SessionSnapshot afterRelease = session.snapshotForTest();
+        assertTrue(afterRelease.reservedBytes() < afterOpen.reservedBytes());
+        assertEquals(afterRelease.negotiatedWindowBytes(),
+                afterRelease.freeWindowBytes() + afterRelease.reservedBytes());
+        assertNull(sender.closeCode);
+    }
+
+    @Test
     void staleEpochAndUnsupportedViewAreHandledWithoutMutatingValidState() throws Exception {
         LupaSession session = new LupaSession(publishedImage(), fakeTileReader(1024), Runnable::run);
         CapturingSender sender = new CapturingSender();
@@ -598,6 +633,40 @@ class LupaSessionTest {
         assertEquals("TILE", header.get("type").asText());
         assertEquals(buffer.remaining(), header.get("payloadBytes").asInt());
         return header;
+    }
+
+    private PublishedImageStore publishedTwoImages() throws Exception {
+        Path dataRoot = temp.resolve("data-two");
+
+        ImageManifest photo = new ImageManifest(
+                1, "photo", "v1", 1024, 768, 256, 0, "onetile",
+                List.of(
+                        new ImageLevel(0, 256, 192),
+                        new ImageLevel(1, 512, 384),
+                        new ImageLevel(2, 1024, 768)));
+        ImageManifest other = new ImageManifest(
+                1, "other", "v1", 800, 600, 256, 0, "onetile",
+                List.of(
+                        new ImageLevel(0, 200, 150),
+                        new ImageLevel(1, 400, 300),
+                        new ImageLevel(2, 800, 600)));
+
+        Path photoVersion = dataRoot.resolve("pyramids/photo/v1");
+        Path otherVersion = dataRoot.resolve("pyramids/other/v1");
+        Files.createDirectories(photoVersion);
+        Files.createDirectories(otherVersion);
+        CatalogJson json = new CatalogJson();
+        Files.write(photoVersion.resolve("manifest.json"), json.writeManifest(photo));
+        Files.write(otherVersion.resolve("manifest.json"), json.writeManifest(other));
+
+        CatalogPublisher publisher = new CatalogPublisher();
+        publisher.publish(
+                dataRoot.resolve("catalog.json"),
+                new CatalogImage("photo", "v1", 1024, 768, 256, 2));
+        publisher.publish(
+                dataRoot.resolve("catalog.json"),
+                new CatalogImage("other", "v1", 800, 600, 256, 2));
+        return new PublishedImageStore(dataRoot);
     }
 
     private PublishedImageStore publishedImage() throws Exception {
