@@ -35,6 +35,7 @@ public final class LupaSession implements WebSocketEndpoint {
     private final Executor diskExecutor;
     private final SerialExecutor serial;
     private final LupaJson json = new LupaJson();
+    private final ViewPlanner viewPlanner = new ViewPlanner();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicBoolean cleanupScheduled = new AtomicBoolean();
     private final Map<Integer, DeliveryReservation> deliveries = new LinkedHashMap<>();
@@ -149,6 +150,11 @@ public final class LupaSession implements WebSocketEndpoint {
                     "windowBytes must be at least " + LupaProtocol.MIN_WINDOW_BYTES);
             return;
         }
+        if (bitmapBudget < LupaProtocol.BITMAP_RESERVED_BYTES) {
+            sendError(sender, null, LupaProtocol.ErrorCode.LIMIT_EXCEEDED,
+                    "bitmapBudgetBytes must be at least " + LupaProtocol.BITMAP_RESERVED_BYTES);
+            return;
+        }
 
         negotiatedWindowBytes = (int) Math.min(requestedWindow, LupaProtocol.MAX_WINDOW_BYTES);
         freeWindowBytes = negotiatedWindowBytes;
@@ -214,78 +220,54 @@ public final class LupaSession implements WebSocketEndpoint {
     }
 
     private void handleView(Sender sender, ObjectNode control) throws LupaControlException {
-        LupaJson.requireOnly(
-                control,
-                "type", "epoch", "imageId", "imageVersion", "rect",
-                "viewportPx", "detailOffset", "mode", "focus");
+        int epoch = LupaJson.requireInt(control, "epoch", 1, LupaProtocol.MAX_EPOCH);
 
         if (state != LupaSessionState.IMAGEN_ABIERTA || opened == null) {
-            policyClose(sender, "OPEN must complete before VIEW");
+            sendError(sender, epoch, LupaProtocol.ErrorCode.BAD_VIEW, "OPEN must complete before VIEW");
             return;
         }
-
-        int epoch = LupaJson.requireInt(control, "epoch", 1, LupaProtocol.MAX_EPOCH);
         if (epoch <= currentEpoch) return;
 
-        String imageId = LupaJson.requireText(control, "imageId");
-        String imageVersion = LupaJson.requireText(control, "imageVersion");
-        if (!imageId.equals(opened.catalogImage().imageId())
-                || !imageVersion.equals(opened.catalogImage().imageVersion())) {
-            sendError(sender, epoch, LupaProtocol.ErrorCode.BAD_VIEW, "VIEW does not match the opened image version");
+        final ViewRequest request;
+        try {
+            request = ViewRequest.parse(
+                    control,
+                    opened.catalogImage().imageId(),
+                    opened.catalogImage().imageVersion(),
+                    opened.manifest().width(),
+                    opened.manifest().height());
+        } catch (LupaControlException e) {
+            sendError(sender, epoch, LupaProtocol.ErrorCode.BAD_VIEW, e.getMessage());
             return;
         }
 
-        int detailOffset = LupaJson.requireInt(control, "detailOffset", -2, 0);
-        String mode = LupaJson.requireText(control, "mode");
-        if (detailOffset != 0 || !"uniform".equals(mode)) {
-            sendError(sender, epoch, LupaProtocol.ErrorCode.BAD_VIEW,
-                    "E20 currently supports mode=uniform with detailOffset=0; focus refinement belongs to E21");
-            return;
-        }
-        LupaJson.requireNull(control, "focus");
-
-        ObjectNode rectNode = LupaJson.requireObject(control, "rect");
-        LupaJson.requireOnly(rectNode, "x", "y", "width", "height");
-        int x = LupaJson.requireInt(rectNode, "x", 0, Integer.MAX_VALUE);
-        int y = LupaJson.requireInt(rectNode, "y", 0, Integer.MAX_VALUE);
-        int width = LupaJson.requireInt(rectNode, "width", 1, Integer.MAX_VALUE);
-        int height = LupaJson.requireInt(rectNode, "height", 1, Integer.MAX_VALUE);
-
-        ImageManifest manifest = opened.manifest();
-        if ((long) x + width > manifest.width() || (long) y + height > manifest.height()) {
-            sendError(sender, epoch, LupaProtocol.ErrorCode.BAD_VIEW, "rect must be fully contained in the opened image");
+        boolean includeOpeningThumbnail = !thumbnailCommittedForOpen;
+        final ViewPlanner.Plan selected;
+        try {
+            selected = viewPlanner.plan(
+                    opened.manifest(),
+                    request,
+                    bitmapBudgetBytes,
+                    includeOpeningThumbnail);
+        } catch (ViewPlanner.PlanningException | ArithmeticException e) {
+            sendError(sender, epoch, LupaProtocol.ErrorCode.LIMIT_EXCEEDED, e.getMessage());
             return;
         }
 
-        ObjectNode viewportNode = LupaJson.requireObject(control, "viewportPx");
-        LupaJson.requireOnly(viewportNode, "width", "height");
-        int viewportWidth = LupaJson.requireInt(viewportNode, "width", 1, Integer.MAX_VALUE);
-        int viewportHeight = LupaJson.requireInt(viewportNode, "height", 1, Integer.MAX_VALUE);
-        long viewportPixels = (long) viewportWidth * viewportHeight;
-        if (viewportPixels > LupaProtocol.MAX_VIEWPORT_PIXELS) {
-            sendError(sender, epoch, LupaProtocol.ErrorCode.LIMIT_EXCEEDED,
-                    "viewportPx exceeds " + LupaProtocol.MAX_VIEWPORT_PIXELS + " pixels");
-            return;
-        }
-
-        int level = automaticLevel(manifest, width, height, viewportWidth, viewportHeight);
         invalidatePlan();
         currentEpoch = epoch;
         long generation = ++planGeneration;
-        ViewPlan view = new ViewPlan(epoch, x, y, width, height, viewportWidth, viewportHeight, level);
-        boolean includeOpeningThumbnail = !thumbnailCommittedForOpen;
         activePlan = new ActivePlan(
                 generation,
-                view,
-                new TilePlanCursor(
-                        manifest, level, x, y, width, height, includeOpeningThumbnail),
-                includeOpeningThumbnail);
+                request,
+                selected,
+                new PlannedTileCursor(selected));
 
         ObjectNode plan = json.mapper().createObjectNode();
         plan.put("type", "PLAN");
         plan.put("epoch", epoch);
-        plan.put("appliedLevel", level);
-        plan.put("contextLevel", level);
+        plan.put("appliedLevel", selected.appliedLevel());
+        plan.put("contextLevel", selected.contextLevel());
         if (sendJson(sender, plan)) pump();
     }
 
@@ -333,9 +315,9 @@ public final class LupaSession implements WebSocketEndpoint {
 
         if (deliveries.size() >= LupaProtocol.MAX_IN_FLIGHT) return;
 
-        TilePlanCursor.TileRef ref = plan.cursor.next();
-        boolean openingThumbnail = plan.openingThumbnailPending;
-        plan.openingThumbnailPending = false;
+        ViewPlanner.TileDescriptor descriptor = plan.cursor.next();
+        ViewPlanner.TileRef ref = descriptor.ref();
+        boolean openingThumbnail = descriptor.role() == ViewPlanner.TileRole.OPENING_THUMBNAIL;
         plan.busy = true;
         long generation = plan.generation;
         PublishedImageStore.OpenedImage imageAtRead = opened;
@@ -366,7 +348,7 @@ public final class LupaSession implements WebSocketEndpoint {
 
     private void onTileRead(
             long generation,
-            TilePlanCursor.TileRef ref,
+            ViewPlanner.TileRef ref,
             boolean openingThumbnail,
             TileData tile,
             TileReadException failure) {
@@ -443,7 +425,7 @@ public final class LupaSession implements WebSocketEndpoint {
     private byte[] buildTileEnvelope(
             int deliveryId,
             int epoch,
-            TilePlanCursor.TileRef ref,
+            ViewPlanner.TileRef ref,
             TileData tile) throws JsonProcessingException {
         byte[] jpeg = tile.jpeg();
         if (jpeg.length > LupaProtocol.MAX_TILE_BYTES) {
@@ -497,22 +479,6 @@ public final class LupaSession implements WebSocketEndpoint {
             state = LupaSessionState.CERRADA;
             sender.close(1011, "credit invariant violated");
         }
-    }
-
-    private int automaticLevel(
-            ImageManifest manifest,
-            int rectWidth,
-            int rectHeight,
-            int viewportWidth,
-            int viewportHeight) {
-        for (ImageLevel level : manifest.levels()) {
-            long availableX = (long) rectWidth * level.width();
-            long requiredX = (long) viewportWidth * manifest.width();
-            long availableY = (long) rectHeight * level.height();
-            long requiredY = (long) viewportHeight * manifest.height();
-            if (availableX >= requiredX && availableY >= requiredY) return level.z();
-        }
-        return manifest.levels().getLast().z();
     }
 
     private void sendManifest(Sender sender, int epoch, ImageManifest manifest) {
@@ -585,39 +551,29 @@ public final class LupaSession implements WebSocketEndpoint {
         return message.length() <= 240 ? message : message.substring(0, 240);
     }
 
-    record ViewPlan(
-            int epoch,
-            int x,
-            int y,
-            int width,
-            int height,
-            int viewportWidth,
-            int viewportHeight,
-            int level) {}
-
     private static final class ActivePlan {
         private final long generation;
-        private final ViewPlan view;
-        private final TilePlanCursor cursor;
+        private final ViewRequest view;
+        private final ViewPlanner.Plan selection;
+        private final PlannedTileCursor cursor;
         private boolean busy;
         private int sentTiles;
         private PendingTile pendingTile;
-        private boolean openingThumbnailPending;
 
         private ActivePlan(
                 long generation,
-                ViewPlan view,
-                TilePlanCursor cursor,
-                boolean openingThumbnailPending) {
+                ViewRequest view,
+                ViewPlanner.Plan selection,
+                PlannedTileCursor cursor) {
             this.generation = generation;
             this.view = view;
+            this.selection = selection;
             this.cursor = cursor;
-            this.openingThumbnailPending = openingThumbnailPending;
         }
     }
 
     private record PendingTile(
-            TilePlanCursor.TileRef ref,
+            ViewPlanner.TileRef ref,
             TileData tile,
             boolean openingThumbnail) {}
 
