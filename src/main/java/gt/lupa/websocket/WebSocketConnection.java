@@ -223,11 +223,24 @@ public final class WebSocketConnection {
     private final class SenderImpl implements WebSocketEndpoint.Sender {
         @Override
         public boolean sendText(String text) {
+            return sendTextTracked(text, () -> {}, () -> {}).accepted();
+        }
+
+        @Override
+        public WebSocketEndpoint.TrackedSend sendTextTracked(
+                String text,
+                Runnable onCommitted,
+                Runnable onWritten) {
             Objects.requireNonNull(text);
+            Objects.requireNonNull(onCommitted);
+            Objects.requireNonNull(onWritten);
             synchronized (stateLock) {
-                if (finished.get() || closeSent) return false;
+                if (finished.get() || closeSent) return WebSocketEndpoint.BinarySend.rejected();
             }
-            return writes.enqueue(WebSocketFrames.text(text), () -> {});
+            return writes.enqueueTracked(
+                    WebSocketFrames.text(text),
+                    onCommitted,
+                    onWritten);
         }
 
         @Override
