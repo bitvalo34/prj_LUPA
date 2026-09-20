@@ -548,7 +548,7 @@ class LupaSessionTest {
         assertNull(sender.closeCode);
     }
 
-    private void hello(LupaSession session, CapturingSender sender, int windowBytes) {
+    private void hello(LupaSession session, WebSocketEndpoint.Sender sender, int windowBytes) {
         session.onText(sender,
                 "{\"type\":\"HELLO\",\"version\":1,\"windowBytes\":" + windowBytes
                         + ",\"bitmapBudgetBytes\":67108864}");
