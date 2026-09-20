@@ -90,6 +90,25 @@ class ViewPlannerTest {
     }
 
     @Test
+    void focusAtImageEdgeIsClippedAndSelectsOnlyIntersectingTile() {
+        ImageManifest manifest = regularManifest();
+        ViewRequest request = new ViewRequest(
+                6, "photo", "v1",
+                new ViewRequest.Rect(0, 0, 1024, 768),
+                new ViewRequest.Viewport(1024, 768),
+                0,
+                ViewRequest.Mode.FOCUS,
+                new ViewRequest.Focus(0, 0, 100));
+
+        List<ViewPlanner.TileRef> focus = ViewPlanner.focusTiles(manifest, 2, request);
+
+        assertEquals(
+                List.of(new ViewPlanner.TileRef(2, 0, 0)),
+                focus,
+                "screen-space circle centered on the image edge must be clipped to the visible image");
+    }
+
+    @Test
     void focusOutsideVisibleRectDoesNotCreateDetailWork() throws Exception {
         ImageManifest manifest = regularManifest();
         ViewRequest request = new ViewRequest(
