@@ -210,7 +210,7 @@ public final class LupaSession implements WebSocketEndpoint {
          * storage validation does not consume the epoch or destroy the current image/plan.
          */
         try {
-            diskExecutor.execute(() -> {
+            metadataExecutor.execute(() -> {
                 PublishedImageStore.OpenedImage candidate = null;
                 LupaProtocol.ErrorCode failureCode = null;
                 String failureMessage = null;
