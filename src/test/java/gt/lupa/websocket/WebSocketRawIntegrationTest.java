@@ -8,6 +8,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -212,10 +213,34 @@ class WebSocketRawIntegrationTest {
     }
 
     private Socket connect() throws Exception {
-        Socket socket = new Socket();
-        socket.connect(new InetSocketAddress("127.0.0.1", server.port()), 1000);
-        socket.setSoTimeout(2000);
-        return socket;
+        InetSocketAddress address = new InetSocketAddress("127.0.0.1", server.port());
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        IOException lastFailure = null;
+
+        /*
+         * The listener is already bound when start() returns, but WSL can occasionally delay a
+         * loopback connect while previous asynchronous channel groups are being torn down.
+         * Retry only the TCP establishment; once connected, all protocol assertions remain strict.
+         */
+        while (System.nanoTime() < deadline) {
+            Socket socket = new Socket();
+            try {
+                socket.connect(address, 500);
+                socket.setSoTimeout(2000);
+                return socket;
+            } catch (IOException e) {
+                lastFailure = e;
+                try {
+                    socket.close();
+                } catch (IOException ignored) {
+                }
+                Thread.sleep(25);
+            }
+        }
+
+        throw new IOException(
+                "could not connect to test server at " + address + " within 3 seconds",
+                lastFailure);
     }
 
     private static byte[] handshakeRequest() {
