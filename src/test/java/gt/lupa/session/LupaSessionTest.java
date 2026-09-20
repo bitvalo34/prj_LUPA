@@ -232,7 +232,7 @@ class LupaSessionTest {
                 {"type":"VIEW","epoch":6,"imageId":"photo","imageVersion":"v1",
                  "rect":{"x":0,"y":0,"width":1024,"height":768},
                  "viewportPx":{"width":512,"height":384},
-                 "detailOffset":-1,"mode":"uniform","focus":null}
+                 "detailOffset":-3,"mode":"uniform","focus":null}
                 """);
         JsonNode error = sender.lastJson();
         assertEquals("ERROR", error.get("type").asText());
@@ -241,6 +241,66 @@ class LupaSessionTest {
         session.onText(sender, view(6));
         assertEquals("DONE", sender.lastJson().get("type").asText(),
                 "rejected VIEW must not consume epoch 6");
+    }
+
+    @Test
+    void detailOffsetIsAppliedToRealPlanLevel() throws Exception {
+        LupaSession session = new LupaSession(publishedImage(), fakeTileReader(1024), Runnable::run);
+        CapturingSender sender = new CapturingSender();
+        session.onOpen(sender);
+
+        hello(session, sender, 1048576);
+        session.onText(sender, """
+                {"type":"OPEN","epoch":1,"imageId":"photo"}
+                """);
+        session.onText(sender, """
+                {"type":"VIEW","epoch":2,"imageId":"photo","imageVersion":"v1",
+                 "rect":{"x":0,"y":0,"width":1024,"height":768},
+                 "viewportPx":{"width":512,"height":384},
+                 "detailOffset":-1,"mode":"uniform","focus":null}
+                """);
+
+        JsonNode plan = sender.firstTextAfter("MANIFEST");
+        assertEquals("PLAN", plan.get("type").asText());
+        assertEquals(0, plan.get("appliedLevel").asInt());
+        assertEquals(0, plan.get("contextLevel").asInt());
+        assertEquals(1, sender.binaries.size(), "z=0 must be enough after detailOffset=-1");
+        assertEquals(0, header(sender.binaries.getFirst()).get("z").asInt());
+        assertEquals("DONE", sender.lastJson().get("type").asText());
+    }
+
+    @Test
+    void focusViewPublishesDifferentContextAndDetailLevels() throws Exception {
+        LupaSession session = new LupaSession(publishedImage(), fakeTileReader(1024), Runnable::run);
+        CapturingSender sender = new CapturingSender();
+        session.onOpen(sender);
+
+        hello(session, sender, 1048576);
+        session.onText(sender, """
+                {"type":"OPEN","epoch":1,"imageId":"photo"}
+                """);
+        session.onText(sender, """
+                {"type":"VIEW","epoch":2,"imageId":"photo","imageVersion":"v1",
+                 "rect":{"x":0,"y":0,"width":1024,"height":768},
+                 "viewportPx":{"width":1024,"height":768},
+                 "detailOffset":0,"mode":"focus",
+                 "focus":{"x":512,"y":384,"radiusPx":120}}
+                """);
+
+        JsonNode plan = sender.firstTextAfter("MANIFEST");
+        assertEquals(2, plan.get("appliedLevel").asInt());
+        assertEquals(1, plan.get("contextLevel").asInt());
+        assertEquals("DONE", sender.lastJson().get("type").asText());
+
+        boolean sawFocusLevel = false;
+        boolean sawContextLevel = false;
+        for (byte[] binary : sender.binaries) {
+            int z = header(binary).get("z").asInt();
+            if (z == 2) sawFocusLevel = true;
+            if (z == 1) sawContextLevel = true;
+        }
+        assertTrue(sawFocusLevel);
+        assertTrue(sawContextLevel);
     }
 
     @Test
