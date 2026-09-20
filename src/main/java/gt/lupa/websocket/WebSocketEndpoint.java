@@ -13,6 +13,21 @@ public interface WebSocketEndpoint {
     interface Sender {
         boolean sendText(String text);
 
+        /**
+         * E21 tracked text write. Controls such as PLAN/DONE can be cancelled while they remain
+         * queued and have not crossed the transport commitment boundary.
+         */
+        default TrackedSend sendTextTracked(
+                String text,
+                Runnable onCommitted,
+                Runnable onWritten) {
+            boolean accepted = sendText(text);
+            if (!accepted) return BinarySend.rejected();
+            onCommitted.run();
+            onWritten.run();
+            return BinarySend.alreadyCommitted();
+        }
+
         boolean sendBinary(byte[] payload);
 
         default boolean sendBinary(byte[] payload, Runnable onWritten) {
@@ -43,13 +58,15 @@ public interface WebSocketEndpoint {
         void close(int code, String reason);
     }
 
-    interface BinarySend {
+    interface TrackedSend {
         boolean accepted();
 
         boolean committed();
 
         boolean cancelIfNotCommitted();
+    }
 
+    interface BinarySend extends TrackedSend {
         static BinarySend rejected() {
             return FixedBinarySend.REJECTED;
         }
