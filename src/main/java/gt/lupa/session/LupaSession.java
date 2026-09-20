@@ -33,6 +33,7 @@ public final class LupaSession implements WebSocketEndpoint {
     private final PublishedImageStore store;
     private final TileReader tileReader;
     private final Executor diskExecutor;
+    private final Executor metadataExecutor;
     private final SerialExecutor serial;
     private final LupaJson json = new LupaJson();
     private final ViewPlanner viewPlanner = new ViewPlanner();
@@ -57,17 +58,31 @@ public final class LupaSession implements WebSocketEndpoint {
     }
 
     public LupaSession(PublishedImageStore store, TileReader tileReader, Executor workerExecutor) {
-        this(store, tileReader, workerExecutor, workerExecutor);
+        this(store, tileReader, workerExecutor, workerExecutor, workerExecutor);
+    }
+
+    /*
+     * Existing deterministic tests use the four-argument constructor to control tile reads only.
+     * Metadata remains synchronous there; production uses the shared worker executor asynchronously.
+     */
+    LupaSession(
+            PublishedImageStore store,
+            TileReader tileReader,
+            Executor stateExecutor,
+            Executor diskExecutor) {
+        this(store, tileReader, stateExecutor, diskExecutor, Runnable::run);
     }
 
     LupaSession(
             PublishedImageStore store,
             TileReader tileReader,
             Executor stateExecutor,
-            Executor diskExecutor) {
+            Executor diskExecutor,
+            Executor metadataExecutor) {
         this.store = Objects.requireNonNull(store);
         this.tileReader = Objects.requireNonNull(tileReader);
         this.diskExecutor = Objects.requireNonNull(diskExecutor);
+        this.metadataExecutor = Objects.requireNonNull(metadataExecutor);
         this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
     }
 
