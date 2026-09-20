@@ -138,8 +138,14 @@ class LupaSessionTest {
         assertNotEquals("DONE", sender.lastJson().path("type").asText());
 
         int firstDelivery = header(sender.binaries.getFirst()).get("deliveryId").asInt();
+        assertEquals(1, firstDelivery);
+        assertEquals(2, header(sender.binaries.get(1)).get("deliveryId").asInt());
+        assertEquals(3, header(sender.binaries.get(2)).get("deliveryId").asInt());
+
         release(session, sender, firstDelivery);
         assertEquals(4, sender.binaries.size());
+        assertEquals(4, header(sender.binaries.get(3)).get("deliveryId").asInt(),
+                "waiting for credit must not consume an unused deliveryId");
 
         release(session, sender, firstDelivery);
         release(session, sender, 2_000_000_000);
