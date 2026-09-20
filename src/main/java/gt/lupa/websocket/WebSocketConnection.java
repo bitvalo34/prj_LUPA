@@ -237,15 +237,27 @@ public final class WebSocketConnection {
 
         @Override
         public boolean sendBinary(byte[] payload, Runnable onWritten) {
+            return sendBinaryTracked(payload, () -> {}, onWritten).accepted();
+        }
+
+        @Override
+        public WebSocketEndpoint.BinarySend sendBinaryTracked(
+                byte[] payload,
+                Runnable onCommitted,
+                Runnable onWritten) {
             Objects.requireNonNull(payload);
+            Objects.requireNonNull(onCommitted);
             Objects.requireNonNull(onWritten);
             if (payload.length > MAX_SERVER_BINARY_BYTES) {
                 throw new IllegalArgumentException("server binary message exceeds LUPA v1 limit");
             }
             synchronized (stateLock) {
-                if (finished.get() || closeSent) return false;
+                if (finished.get() || closeSent) return WebSocketEndpoint.BinarySend.rejected();
             }
-            return writes.enqueue(WebSocketFrames.binary(payload), onWritten);
+            return writes.enqueueTracked(
+                    WebSocketFrames.binary(payload),
+                    onCommitted,
+                    onWritten);
         }
 
         @Override
