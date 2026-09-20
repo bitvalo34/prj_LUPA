@@ -24,11 +24,17 @@ final class DeliveryIdSequence {
         return next > LupaProtocol.MAX_EPOCH;
     }
 
-    int take() {
+    int peek() {
         if (exhausted()) {
             throw new IllegalStateException("deliveryId space is exhausted");
         }
-        return (int) next++;
+        return (int) next;
+    }
+
+    int take() {
+        int value = peek();
+        next++;
+        return value;
     }
 
     long nextValue() {
