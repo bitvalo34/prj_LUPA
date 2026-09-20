@@ -376,6 +376,95 @@ class LupaSessionTest {
     }
 
     @Test
+    void replacedViewCancelsQueuedPlanBeforeItBecomesVisible() throws Exception {
+        LupaSession session = new LupaSession(
+                publishedImage(), fakeTileReader(1024), Runnable::run);
+        ControlHoldingSender sender = new ControlHoldingSender("PLAN");
+        session.onOpen(sender);
+
+        hello(session, sender, 1048576);
+        session.onText(sender, "{\"type\":\"OPEN\",\"epoch\":1,\"imageId\":\"photo\"}");
+        session.onText(sender, view(2));
+
+        assertNotNull(sender.held);
+        assertFalse(sender.held.committed());
+        assertTrue(sender.binaries.isEmpty(),
+                "TILE must not start before PLAN crosses the commitment boundary");
+
+        session.onText(sender, view(3));
+
+        assertTrue(sender.held.cancelled);
+        assertTrue(sender.texts.stream().noneMatch(text -> {
+            try {
+                JsonNode node = mapper.readTree(text);
+                return "PLAN".equals(node.path("type").asText())
+                        && node.path("epoch").asInt() == 2;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }));
+        assertTrue(sender.texts.stream().anyMatch(text -> {
+            try {
+                JsonNode node = mapper.readTree(text);
+                return "PLAN".equals(node.path("type").asText())
+                        && node.path("epoch").asInt() == 3;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }));
+        assertFalse(sender.binaries.isEmpty());
+        for (byte[] binary : sender.binaries) {
+            assertEquals(3, header(binary).path("epoch").asInt());
+        }
+    }
+
+    @Test
+    void replacedViewCancelsQueuedDoneBeforeItBecomesVisible() throws Exception {
+        LupaSession session = new LupaSession(
+                publishedImage(), fakeTileReader(1024), Runnable::run);
+        ControlHoldingSender sender = new ControlHoldingSender("DONE");
+        session.onOpen(sender);
+
+        hello(session, sender, 1048576);
+        session.onText(sender, "{\"type\":\"OPEN\",\"epoch\":1,\"imageId\":\"photo\"}");
+        session.onText(sender, view(2));
+
+        assertNotNull(sender.held);
+        assertFalse(sender.held.committed());
+        assertTrue(sender.texts.stream().noneMatch(text -> {
+            try {
+                JsonNode node = mapper.readTree(text);
+                return "DONE".equals(node.path("type").asText())
+                        && node.path("epoch").asInt() == 2;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }));
+
+        session.onText(sender, view(3));
+
+        assertTrue(sender.held.cancelled);
+        assertTrue(sender.texts.stream().noneMatch(text -> {
+            try {
+                JsonNode node = mapper.readTree(text);
+                return "DONE".equals(node.path("type").asText())
+                        && node.path("epoch").asInt() == 2;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }));
+        assertTrue(sender.texts.stream().anyMatch(text -> {
+            try {
+                JsonNode node = mapper.readTree(text);
+                return "DONE".equals(node.path("type").asText())
+                        && node.path("epoch").asInt() == 3;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }));
+    }
+
+    @Test
     void laterSuccessfulOpenWinsEvenWhenOlderStorageResultCompletesLast() throws Exception {
         ManualExecutor metadata = new ManualExecutor();
         LupaSession session = new LupaSession(
@@ -570,6 +659,111 @@ class LupaSessionTest {
             }
             fail("text after " + type + " not found");
             return null;
+        }
+    }
+
+    private final class ControlHoldingSender implements WebSocketEndpoint.Sender {
+        private final List<String> texts = new ArrayList<>();
+        private final List<byte[]> binaries = new ArrayList<>();
+        private final String holdType;
+        private TestControlSend held;
+        private Integer closeCode;
+
+        private ControlHoldingSender(String holdType) {
+            this.holdType = holdType;
+        }
+
+        @Override
+        public boolean sendText(String text) {
+            texts.add(text);
+            return true;
+        }
+
+        @Override
+        public WebSocketEndpoint.TrackedSend sendTextTracked(
+                String text,
+                Runnable onCommitted,
+                Runnable onWritten) {
+            try {
+                JsonNode node = mapper.readTree(text);
+                if (held == null && holdType.equals(node.path("type").asText())) {
+                    held = new TestControlSend(text, onCommitted, onWritten);
+                    return held;
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+            texts.add(text);
+            onCommitted.run();
+            onWritten.run();
+            return WebSocketEndpoint.BinarySend.alreadyCommitted();
+        }
+
+        @Override
+        public boolean sendBinary(byte[] payload) {
+            binaries.add(payload.clone());
+            return true;
+        }
+
+        @Override
+        public WebSocketEndpoint.BinarySend sendBinaryTracked(
+                byte[] payload,
+                Runnable onCommitted,
+                Runnable onWritten) {
+            binaries.add(payload.clone());
+            onCommitted.run();
+            onWritten.run();
+            return WebSocketEndpoint.BinarySend.alreadyCommitted();
+        }
+
+        @Override
+        public void close(int code, String reason) {
+            closeCode = code;
+        }
+
+        private final class TestControlSend implements WebSocketEndpoint.TrackedSend {
+            private final String text;
+            private final Runnable onCommitted;
+            private final Runnable onWritten;
+            private boolean committed;
+            private boolean written;
+            private boolean cancelled;
+
+            private TestControlSend(String text, Runnable onCommitted, Runnable onWritten) {
+                this.text = text;
+                this.onCommitted = onCommitted;
+                this.onWritten = onWritten;
+            }
+
+            @Override
+            public boolean accepted() {
+                return !cancelled;
+            }
+
+            @Override
+            public boolean committed() {
+                return committed;
+            }
+
+            @Override
+            public boolean cancelIfNotCommitted() {
+                if (committed || cancelled) return false;
+                cancelled = true;
+                return true;
+            }
+
+            @SuppressWarnings("unused")
+            private void commitAndWrite() {
+                if (cancelled || committed) return;
+                committed = true;
+                texts.add(text);
+                onCommitted.run();
+                if (!written) {
+                    written = true;
+                    onWritten.run();
+                }
+            }
         }
     }
 
