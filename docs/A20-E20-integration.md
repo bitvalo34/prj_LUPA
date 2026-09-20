@@ -243,3 +243,177 @@ E20 no declara completos en esta tarea:
 - política avanzada de navegación rápida y cancelación de E21/E22.
 
 Para I20, usar el subconjunto uniforme documentado arriba.
+
+
+---
+
+# E21 addendum — contrato operativo para A21
+
+Este addendum concreta el comportamiento que A21 debe consumir después de E21. Sustituye las limitaciones temporales de E20 donde se indicaba que `focus` y `detailOffset` todavía no estaban implementados.
+
+## VIEW efectivo en E21
+
+E21 acepta:
+
+- `detailOffset`: `-2`, `-1` o `0`.
+- `mode`: `uniform` o `focus`.
+- `focus=null` en modo `uniform`.
+- En modo `focus`, `focus.x` y `focus.y` están en coordenadas de la imagen original y `focus.radiusPx` está en píxeles físicos del viewport.
+
+Las coordenadas `rect` también están en el espacio de la imagen original. `viewportPx` describe exclusivamente el rectángulo físico realmente ocupado por la imagen, no las bandas de letterboxing. A20 ya calcula esta transformación con `computeFitLayout` y `viewportForRect`.
+
+### Uniform
+
+Ejemplo:
+
+```json
+{
+  "type":"VIEW",
+  "epoch":10,
+  "imageId":"demo-auxiliar",
+  "imageVersion":"v1",
+  "rect":{"x":0,"y":0,"width":1096,"height":815},
+  "viewportPx":{"width":800,"height":595},
+  "detailOffset":-1,
+  "mode":"uniform",
+  "focus":null
+}
+```
+
+En `uniform`:
+
+```text
+contextLevel == appliedLevel
+```
+
+`detailOffset` se aplica sobre el nivel automático y el nivel efectivo puede bajar adicionalmente si el presupuesto bitmap o el límite de descriptores lo requiere. Por eso A21 debe dibujar lo que anuncia PLAN y no inferir por su cuenta el nivel final.
+
+### Focus
+
+Ejemplo:
+
+```json
+{
+  "type":"VIEW",
+  "epoch":11,
+  "imageId":"demo-auxiliar",
+  "imageVersion":"v1",
+  "rect":{"x":0,"y":0,"width":1096,"height":815},
+  "viewportPx":{"width":800,"height":595},
+  "detailOffset":0,
+  "mode":"focus",
+  "focus":{"x":548,"y":407,"radiusPx":140}
+}
+```
+
+Política E21:
+
+```text
+contextLevel = max(0, appliedLevel - 1)
+```
+
+salvo que el foco recortado no interseque la región visible, caso en el que E21 no anuncia detalle que no vaya a enviar.
+
+El círculo de `radiusPx` se transforma al espacio original con una escala independiente por eje. Si la relación de aspecto difiere, su región geométrica en coordenadas originales es una elipse, no un círculo arbitrario.
+
+## Orden del plan y composición
+
+Orden E21:
+
+1. miniatura inicial z=0 cuando todavía no fue comprometida para ese OPEN;
+2. contexto mínimo;
+3. foco visible;
+4. resto de contexto visible.
+
+A21 debe componer niveles de menor a mayor detalle para que el contexto nunca tape una tesela de mayor resolución. El compositor actual de A20 ya ordena primero `context` y después `detail`; A21 debe extender esa clasificación para reconocer `contextLevel` del PLAN, no asumir que únicamente z=0 es contexto.
+
+## Sustitución por época
+
+No existe mensaje CANCEL.
+
+Una VIEW válida con época mayor sustituye el plan previo. Una OPEN válida posterior sustituye imagen y plan. Una solicitud inválida no consume la época.
+
+El servidor puede retirar:
+
+- selección aún no leída;
+- lectura todavía pendiente/no comprometida;
+- resultado de lectura obsoleto;
+- TILE todavía encolada antes de entregarse al canal asíncrono.
+
+No puede prometer retirar una TILE cuyo frame ya fue comprometido a `AsynchronousSocketChannel.write`.
+
+Por tanto A21 debe:
+
+- descartar mensajes de épocas antiguas antes de decodificar cuando sea posible;
+- volver a comprobar `epoch` y versión después de decodificar;
+- cerrar cualquier ImageBitmap obsoleto;
+- enviar RELEASE incluso para una entrega antigua ya transmitida.
+
+## Créditos y RELEASE
+
+La reserva del servidor para cada TILE es:
+
+```text
+4 + H + payloadBytes
+```
+
+sin contar overhead WebSocket.
+
+La ventana negociada y el espacio de `deliveryId` no se reinician al cambiar VIEW u OPEN.
+
+Estados válidos:
+
+```text
+displayed
+discarded
+failed
+```
+
+Un RELEASE duplicado o desconocido se ignora sin crear crédito. A21 nunca envía una cantidad de bytes en RELEASE.
+
+Antes de agotar `epoch=2147483647` o el espacio de deliveryId, el cliente debe cerrar y reconectar. El servidor no reutiliza deliveryId dentro de una conexión.
+
+## DONE
+
+DONE significa únicamente:
+
+> todos los TILE de ese plan vigente terminaron su escritura en el transporte.
+
+No significa:
+
+- que todos estén decodificados;
+- que todos estén dibujados;
+- que todos tengan RELEASE;
+- que el compositor visual haya terminado.
+
+A21 debe conservar su propia condición de "vista lista" basada en Worker + compositor, como ya hacía A20.
+
+## Errores
+
+Errores recuperables de aplicación definidos por LUPA v1:
+
+- `VERSION_UNSUPPORTED`
+- `BAD_VIEW`
+- `IMAGE_NOT_FOUND`
+- `IMAGE_NOT_READY`
+- `LIMIT_EXCEEDED`
+- `INTERNAL_READ_ERROR`
+
+Una VIEW inválida devuelve `BAD_VIEW` sin destruir la intención válida anterior.
+
+Violaciones de encuadre/formato o secuencia no recuperable pueden cerrar el WebSocket. A21 debe distinguir un ERROR LUPA de un cierre de transporte.
+
+## Responsabilidad de A21
+
+A21 puede añadir controles de pan/zoom/foco y navegación, pero debe preservar:
+
+- coordenadas originales para `rect` y centro del foco;
+- `viewportPx` físico de la zona de imagen real;
+- `radiusPx` físico;
+- monotonicidad de épocas;
+- descarte de resultados obsoletos;
+- RELEASE único por entrega;
+- composición contexto → detalle;
+- reconexión antes de agotar identificadores.
+
+E21 no implementa esos controles visuales; solo entrega el contrato backend necesario.
