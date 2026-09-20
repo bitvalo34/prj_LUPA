@@ -47,7 +47,7 @@ public final class LupaSession implements WebSocketEndpoint {
     private int negotiatedWindowBytes;
     private long freeWindowBytes;
     private long bitmapBudgetBytes;
-    private long nextDeliveryId = 1;
+    private final DeliveryIdSequence deliveryIds;
     private long planGeneration;
     private boolean thumbnailCommittedForOpen;
     private PublishedImageStore.OpenedImage opened;
@@ -84,6 +84,22 @@ public final class LupaSession implements WebSocketEndpoint {
         this.diskExecutor = Objects.requireNonNull(diskExecutor);
         this.metadataExecutor = Objects.requireNonNull(metadataExecutor);
         this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
+        this.deliveryIds = new DeliveryIdSequence();
+    }
+
+    LupaSession(
+            PublishedImageStore store,
+            TileReader tileReader,
+            Executor stateExecutor,
+            Executor diskExecutor,
+            Executor metadataExecutor,
+            long firstDeliveryId) {
+        this.store = Objects.requireNonNull(store);
+        this.tileReader = Objects.requireNonNull(tileReader);
+        this.diskExecutor = Objects.requireNonNull(diskExecutor);
+        this.metadataExecutor = Objects.requireNonNull(metadataExecutor);
+        this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
+        this.deliveryIds = new DeliveryIdSequence(firstDeliveryId);
     }
 
     @Override
@@ -275,7 +291,7 @@ public final class LupaSession implements WebSocketEndpoint {
         int epoch = LupaJson.requireInt(control, "epoch", 1, LupaProtocol.MAX_EPOCH);
 
         if (state != LupaSessionState.IMAGEN_ABIERTA || opened == null) {
-            sendError(sender, epoch, LupaProtocol.ErrorCode.BAD_VIEW, "OPEN must complete before VIEW");
+            policyClose(sender, "OPEN must complete before VIEW");
             return;
         }
         if (epoch <= currentEpoch) return;
@@ -421,13 +437,16 @@ public final class LupaSession implements WebSocketEndpoint {
     private void trySendPending(ActivePlan plan) {
         if (closed.get() || activePlan != plan || plan.busy || plan.pendingTile == null) return;
         if (deliveries.size() >= LupaProtocol.MAX_IN_FLIGHT) return;
-        if (nextDeliveryId > LupaProtocol.MAX_EPOCH) {
-            failPlan(plan, LupaProtocol.ErrorCode.LIMIT_EXCEEDED, "deliveryId space is exhausted");
+        if (deliveryIds.exhausted()) {
+            requireNewSession(
+                    plan.view.epoch(),
+                    LupaProtocol.ErrorCode.LIMIT_EXCEEDED,
+                    "deliveryId space is exhausted; reconnect with a new LUPA session");
             return;
         }
 
         PendingTile pending = plan.pendingTile;
-        int deliveryId = (int) nextDeliveryId;
+        int deliveryId = deliveryIds.take();
         final byte[] envelope;
         try {
             envelope = buildTileEnvelope(deliveryId, plan.view.epoch(), pending.ref, pending.tile);
@@ -451,7 +470,6 @@ public final class LupaSession implements WebSocketEndpoint {
                 pending.openingThumbnail());
         deliveries.put(deliveryId, reservation);
         freeWindowBytes -= reservationBytes;
-        nextDeliveryId++;
         plan.pendingTile = null;
         plan.busy = true;
         enforceCreditInvariant(sender);
@@ -539,7 +557,19 @@ public final class LupaSession implements WebSocketEndpoint {
         if (activePlan != plan) return;
         activePlan = null;
         planGeneration++;
+        cancelUncommittedDeliveries(plan.generation);
         sendError(sender, plan.view.epoch(), code, message);
+    }
+
+    private void requireNewSession(
+            Integer epoch,
+            LupaProtocol.ErrorCode code,
+            String message) {
+        sendError(sender, epoch, code, message);
+        if (closed.compareAndSet(false, true)) {
+            state = LupaSessionState.CERRADA;
+            sender.close(1008, boundedMessage(message));
+        }
     }
 
     private void invalidatePlan() {
@@ -648,6 +678,34 @@ public final class LupaSession implements WebSocketEndpoint {
         if (message == null || message.isBlank()) return "LUPA request rejected";
         return message.length() <= 240 ? message : message.substring(0, 240);
     }
+
+    SessionSnapshot snapshotForTest() {
+        long reserved = 0;
+        for (DeliveryReservation reservation : deliveries.values()) {
+            reserved += reservation.reservedBytes;
+        }
+        return new SessionSnapshot(
+                state,
+                currentEpoch,
+                negotiatedWindowBytes,
+                freeWindowBytes,
+                reserved,
+                deliveries.size(),
+                deliveryIds.nextValue(),
+                opened == null ? null : opened.catalogImage().imageId(),
+                activePlan == null ? null : activePlan.view.epoch());
+    }
+
+    record SessionSnapshot(
+            LupaSessionState state,
+            int currentEpoch,
+            int negotiatedWindowBytes,
+            long freeWindowBytes,
+            long reservedBytes,
+            int pendingDeliveries,
+            long nextDeliveryId,
+            String openedImageId,
+            Integer activePlanEpoch) {}
 
     private static final class ActivePlan {
         private final long generation;
