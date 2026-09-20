@@ -304,6 +304,143 @@ class LupaSessionTest {
     }
 
     @Test
+    void newViewCancelsReservedButUncommittedTileAndDoesNotReuseDeliveryId() throws Exception {
+        LupaSession session = new LupaSession(
+                publishedImage(), fakeTileReader(262_000), Runnable::run);
+        ControlledSender sender = new ControlledSender(HoldMode.BEFORE_COMMIT);
+        session.onOpen(sender);
+
+        session.onText(sender,
+                "{\"type\":\"HELLO\",\"version\":1,\"windowBytes\":524288,"
+                        + "\"bitmapBudgetBytes\":67108864}");
+        session.onText(sender, "{\"type\":\"OPEN\",\"epoch\":1,\"imageId\":\"photo\"}");
+        session.onText(sender, view(2));
+
+        assertNotNull(sender.firstSend);
+        assertFalse(sender.firstSend.committed());
+        assertEquals(0, sender.binaries.size(), "queued tile must not be visible on the wire");
+
+        session.onText(sender, view(3));
+
+        assertTrue(sender.firstSend.cancelled);
+        assertFalse(sender.binaries.isEmpty(),
+                "credit from cancelled uncommitted delivery must be refunded for the new plan");
+        JsonNode firstVisible = header(sender.binaries.getFirst());
+        assertEquals(3, firstVisible.get("epoch").asInt());
+        assertEquals(2, firstVisible.get("deliveryId").asInt(),
+                "cancelled deliveryId=1 is never reused");
+        assertNull(sender.closeCode);
+    }
+
+    @Test
+    void committedOldTileKeepsReservationUntilReleaseAndReleaseMayBeatWriteCallback() throws Exception {
+        LupaSession session = new LupaSession(
+                publishedImage(), fakeTileReader(262_000), Runnable::run);
+        ControlledSender sender = new ControlledSender(HoldMode.AFTER_COMMIT);
+        session.onOpen(sender);
+
+        session.onText(sender,
+                "{\"type\":\"HELLO\",\"version\":1,\"windowBytes\":524288,"
+                        + "\"bitmapBudgetBytes\":67108864}");
+        session.onText(sender, "{\"type\":\"OPEN\",\"epoch\":1,\"imageId\":\"photo\"}");
+        session.onText(sender, view(2));
+
+        assertNotNull(sender.firstSend);
+        assertTrue(sender.firstSend.committed());
+        assertEquals(1, sender.binaries.size());
+        int oldDelivery = header(sender.binaries.getFirst()).get("deliveryId").asInt();
+
+        session.onText(sender, view(3));
+        assertEquals(1, sender.binaries.size(),
+                "committed old TILE keeps its credit and cannot be removed by VIEW replacement");
+
+        session.onText(sender,
+                "{\"type\":\"RELEASE\",\"deliveryId\":" + oldDelivery
+                        + ",\"status\":\"discarded\"}");
+
+        assertTrue(sender.binaries.size() >= 2,
+                "RELEASE of old epoch must restore credit and let the current plan advance");
+        JsonNode newTile = header(sender.binaries.get(1));
+        assertEquals(3, newTile.get("epoch").asInt());
+        assertTrue(newTile.get("deliveryId").asInt() > oldDelivery);
+
+        int beforeLateCallback = sender.binaries.size();
+        sender.firstSend.completeWritten();
+        session.onText(sender,
+                "{\"type\":\"RELEASE\",\"deliveryId\":" + oldDelivery
+                        + ",\"status\":\"discarded\"}");
+
+        assertEquals(beforeLateCallback, sender.binaries.size(),
+                "late write callback and duplicate RELEASE must not manufacture credit");
+        assertNull(sender.closeCode);
+    }
+
+    @Test
+    void laterSuccessfulOpenWinsEvenWhenOlderStorageResultCompletesLast() throws Exception {
+        ManualExecutor metadata = new ManualExecutor();
+        LupaSession session = new LupaSession(
+                publishedImage(),
+                fakeTileReader(1024),
+                Runnable::run,
+                Runnable::run,
+                metadata);
+        CapturingSender sender = new CapturingSender();
+        session.onOpen(sender);
+
+        hello(session, sender, 1048576);
+        session.onText(sender, "{\"type\":\"OPEN\",\"epoch\":2,\"imageId\":\"photo\"}");
+        session.onText(sender, "{\"type\":\"OPEN\",\"epoch\":3,\"imageId\":\"photo\"}");
+        assertEquals(2, metadata.size());
+
+        metadata.runLast();
+        metadata.runAll();
+
+        long manifests = sender.texts.stream()
+                .map(text -> {
+                    try { return mapper.readTree(text); }
+                    catch (Exception e) { throw new RuntimeException(e); }
+                })
+                .filter(node -> "MANIFEST".equals(node.path("type").asText()))
+                .count();
+        assertEquals(1, manifests);
+        JsonNode manifest = sender.texts.stream()
+                .map(text -> {
+                    try { return mapper.readTree(text); }
+                    catch (Exception e) { throw new RuntimeException(e); }
+                })
+                .filter(node -> "MANIFEST".equals(node.path("type").asText()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(3, manifest.get("epoch").asInt());
+    }
+
+    @Test
+    void invalidHigherOpenDoesNotConsumeEpochOrSuppressOlderValidOpen() throws Exception {
+        ManualExecutor metadata = new ManualExecutor();
+        LupaSession session = new LupaSession(
+                publishedImage(),
+                fakeTileReader(1024),
+                Runnable::run,
+                Runnable::run,
+                metadata);
+        CapturingSender sender = new CapturingSender();
+        session.onOpen(sender);
+
+        hello(session, sender, 1048576);
+        session.onText(sender, "{\"type\":\"OPEN\",\"epoch\":2,\"imageId\":\"photo\"}");
+        session.onText(sender, "{\"type\":\"OPEN\",\"epoch\":3,\"imageId\":\"missing\"}");
+
+        metadata.runLast();
+        assertEquals("IMAGE_NOT_FOUND", sender.lastJson().path("code").asText());
+
+        metadata.runAll();
+        assertEquals("MANIFEST", sender.lastJson().path("type").asText());
+        assertEquals(2, sender.lastJson().path("epoch").asInt(),
+                "failed epoch 3 must not consume the last accepted epoch");
+        assertNull(sender.closeCode);
+    }
+
+    @Test
     void missingImageReturnsImageNotFoundWithoutDestroyingReadySession() throws Exception {
         LupaSession session = new LupaSession(publishedImage(), fakeTileReader(1024), Runnable::run);
         CapturingSender sender = new CapturingSender();
@@ -436,8 +573,108 @@ class LupaSessionTest {
         }
     }
 
+    private final class ControlledSender implements WebSocketEndpoint.Sender {
+        private final List<String> texts = new ArrayList<>();
+        private final List<byte[]> binaries = new ArrayList<>();
+        private final HoldMode mode;
+        private TestSend firstSend;
+        private int trackedCount;
+        private Integer closeCode;
+
+        private ControlledSender(HoldMode mode) {
+            this.mode = mode;
+        }
+
+
+        @Override
+        public boolean sendText(String text) {
+            texts.add(text);
+            return true;
+        }
+
+        @Override
+        public boolean sendBinary(byte[] payload) {
+            binaries.add(payload.clone());
+            return true;
+        }
+
+        @Override
+        public WebSocketEndpoint.BinarySend sendBinaryTracked(
+                byte[] payload,
+                Runnable onCommitted,
+                Runnable onWritten) {
+            trackedCount++;
+            if (trackedCount == 1 && mode != HoldMode.NONE) {
+                firstSend = new TestSend(payload.clone(), onCommitted, onWritten);
+                if (mode == HoldMode.AFTER_COMMIT) firstSend.commit();
+                return firstSend;
+            }
+
+            binaries.add(payload.clone());
+            onCommitted.run();
+            onWritten.run();
+            return WebSocketEndpoint.BinarySend.alreadyCommitted();
+        }
+
+        @Override
+        public void close(int code, String reason) {
+            closeCode = code;
+        }
+
+        private final class TestSend implements WebSocketEndpoint.BinarySend {
+            private final byte[] payload;
+            private final Runnable onCommitted;
+            private final Runnable onWritten;
+            private boolean committed;
+            private boolean written;
+            private boolean cancelled;
+
+            private TestSend(byte[] payload, Runnable onCommitted, Runnable onWritten) {
+                this.payload = payload;
+                this.onCommitted = onCommitted;
+                this.onWritten = onWritten;
+            }
+
+            private void commit() {
+                if (cancelled || committed) return;
+                committed = true;
+                binaries.add(payload.clone());
+                onCommitted.run();
+            }
+
+            private void completeWritten() {
+                if (!committed || written) return;
+                written = true;
+                onWritten.run();
+            }
+
+            @Override
+            public boolean accepted() {
+                return !cancelled;
+            }
+
+            @Override
+            public boolean committed() {
+                return committed;
+            }
+
+            @Override
+            public boolean cancelIfNotCommitted() {
+                if (committed || cancelled) return false;
+                cancelled = true;
+                return true;
+            }
+        }
+    }
+
+    private enum HoldMode {
+        NONE,
+        BEFORE_COMMIT,
+        AFTER_COMMIT
+    }
+
     private static final class ManualExecutor implements Executor {
-        private final Queue<Runnable> tasks = new ArrayDeque<>();
+        private final ArrayDeque<Runnable> tasks = new ArrayDeque<>();
 
         @Override
         public void execute(Runnable command) {
@@ -451,6 +688,11 @@ class LupaSessionTest {
         void runOne() {
             Runnable next = tasks.poll();
             if (next != null) next.run();
+        }
+
+        void runLast() {
+            Runnable last = tasks.pollLast();
+            if (last != null) last.run();
         }
 
         void runAll() {
