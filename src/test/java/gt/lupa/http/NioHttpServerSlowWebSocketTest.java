@@ -224,18 +224,18 @@ class NioHttpServerSlowWebSocketTest {
     }
 
     private static byte[] handshakeRequest() {
-        return ("""
-                GET /lupa HTTP/1.1
-                Host: localhost
-                Upgrade: websocket
-                Connection: keep-alive, Upgrade
-                Sec-WebSocket-Version: 13
-                Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
-                Sec-WebSocket-Protocol: lupa.v1
-                
-                """)
-                .getBytes(
-                        StandardCharsets.ISO_8859_1);
+        String request =
+                "GET /lupa HTTP/1.1\\r\\n"
+                        + "Host: localhost\\r\\n"
+                        + "Upgrade: websocket\\r\\n"
+                        + "Connection: keep-alive, Upgrade\\r\\n"
+                        + "Sec-WebSocket-Version: 13\\r\\n"
+                        + "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\\r\\n"
+                        + "Sec-WebSocket-Protocol: lupa.v1\\r\\n"
+                        + "\\r\\n";
+
+        return request.getBytes(
+                StandardCharsets.ISO_8859_1);
     }
 
     private static byte[] maskedText(
