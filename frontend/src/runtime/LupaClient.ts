@@ -513,6 +513,14 @@ export class LupaClient {
 
     if (header.epoch < this.epoch) {
       this.discardedTiles++;
+      this.trace.push(
+        'LOCAL',
+        'STALE_TILE',
+        'delivery=' + header.deliveryId +
+          ' epoch=' + header.epoch +
+          ' currentEpoch=' + this.epoch +
+          ' discarded antes del Worker'
+      );
       this.release(header.deliveryId, connectionId, 'discarded');
       this.notifySoon();
       return;
@@ -625,7 +633,14 @@ export class LupaClient {
           this.release(response.deliveryId, response.connectionId, 'failed');
         }
       }
-      this.trace.push('LOCAL', response.type.toUpperCase(), response.reason);
+      this.trace.push(
+        'LOCAL',
+        response.type.toUpperCase(),
+        'delivery=' + response.deliveryId +
+          ' epoch=' + response.epoch +
+          ' connection=' + response.connectionId +
+          ' reason=' + response.reason
+      );
     }
 
     this.updateCompletionPhase();
