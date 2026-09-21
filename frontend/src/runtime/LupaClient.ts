@@ -148,6 +148,19 @@ export class LupaClient {
     this.worker = workerFactory();
     this.worker.addEventListener('message', (event: MessageEvent<WorkerResponse>) => this.onWorker(event.data));
     this.worker.addEventListener('error', () => this.fail('El Worker de decodificación falló'));
+
+    const diagnosticDelayMs = readI21DecodeDelayMs();
+    if (diagnosticDelayMs > 0) {
+      this.worker.postMessage({
+        type: 'configureDiagnostic',
+        postDecodeDelayMs: diagnosticDelayMs
+      });
+      this.trace.push(
+        'LOCAL',
+        'I21_DIAG',
+        'postDecodeDelayMs=' + diagnosticDelayMs + ' (solo diagnóstico local)'
+      );
+    }
   }
 
   subscribe(listener: (snapshot: ClientSnapshot) => void): () => void {
@@ -909,6 +922,15 @@ export class LupaClient {
     const snapshot = this.snapshot();
     for (const listener of this.listeners) listener(snapshot);
   }
+}
+
+function readI21DecodeDelayMs(): number {
+  if (typeof window === 'undefined') return 0;
+  const raw = new URLSearchParams(window.location.search).get('i21DecodeDelayMs');
+  if (raw === null || raw.trim() === '') return 0;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(2000, Math.round(parsed)));
 }
 
 function summarizeControl(control: Record<string, unknown>): string {
