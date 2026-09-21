@@ -1,7 +1,11 @@
 package gt.lupa.websocket;
 
 import java.nio.ByteBuffer;
+import gt.lupa.concurrent.MonotonicScheduler;
+import gt.lupa.diagnostics.E22Metrics;
+
 import java.nio.channels.CompletionHandler;
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Objects;
@@ -17,6 +21,9 @@ public final class WebSocketWriteQueue {
     private final WriteTarget target;
     private final int maxQueuedFrames;
     private final Consumer<Throwable> onFailure;
+    private final MonotonicScheduler scheduler;
+    private final Duration writeProgressTimeout;
+    private final E22Metrics metrics;
     private final Deque<PendingWrite> queue = new ArrayDeque<>();
     private boolean writePending;
     private boolean failed;
@@ -28,10 +35,57 @@ public final class WebSocketWriteQueue {
     private boolean driveActive;
     private boolean driveRequested;
 
-    public WebSocketWriteQueue(WriteTarget target, int maxQueuedFrames, Consumer<Throwable> onFailure) {
+    public WebSocketWriteQueue(
+            WriteTarget target,
+            int maxQueuedFrames,
+            Consumer<Throwable> onFailure) {
+        this(
+                target,
+                maxQueuedFrames,
+                null,
+                null,
+                new E22Metrics(),
+                onFailure);
+    }
+
+    public WebSocketWriteQueue(
+            WriteTarget target,
+            int maxQueuedFrames,
+            MonotonicScheduler scheduler,
+            Duration writeProgressTimeout,
+            Consumer<Throwable> onFailure) {
+        this(
+                target,
+                maxQueuedFrames,
+                scheduler,
+                writeProgressTimeout,
+                new E22Metrics(),
+                onFailure);
+    }
+
+    public WebSocketWriteQueue(
+            WriteTarget target,
+            int maxQueuedFrames,
+            MonotonicScheduler scheduler,
+            Duration writeProgressTimeout,
+            E22Metrics metrics,
+            Consumer<Throwable> onFailure) {
         this.target = Objects.requireNonNull(target);
-        if (maxQueuedFrames < 1) throw new IllegalArgumentException("maxQueuedFrames must be positive");
+        if (maxQueuedFrames < 1) {
+            throw new IllegalArgumentException("maxQueuedFrames must be positive");
+        }
+        if ((scheduler == null) != (writeProgressTimeout == null)) {
+            throw new IllegalArgumentException(
+                    "scheduler and writeProgressTimeout must be configured together");
+        }
+        if (writeProgressTimeout != null
+                && (writeProgressTimeout.isZero() || writeProgressTimeout.isNegative())) {
+            throw new IllegalArgumentException("writeProgressTimeout must be positive");
+        }
         this.maxQueuedFrames = maxQueuedFrames;
+        this.scheduler = scheduler;
+        this.writeProgressTimeout = writeProgressTimeout;
+        this.metrics = Objects.requireNonNull(metrics);
         this.onFailure = Objects.requireNonNull(onFailure);
     }
 
@@ -94,6 +148,7 @@ public final class WebSocketWriteQueue {
                 if (current.state == PendingState.QUEUED) {
                     current.state = PendingState.COMMITTED;
                     committedCallback = current.onCommitted;
+                    armProgressTimeoutLocked(current);
                 }
                 driveRequested = false;
             }
@@ -113,9 +168,19 @@ public final class WebSocketWriteQueue {
                     @Override
                     public void completed(Integer written, Void attachment) {
                         if (written == null || written < 0) {
-                            failed(new IllegalStateException("socket write returned " + written), attachment);
+                            failed(
+                                    new IllegalStateException(
+                                            "socket write returned " + written),
+                                    attachment);
                             return;
                         }
+
+                        synchronized (WebSocketWriteQueue.this) {
+                            if (written > 0 && committed.buffer.hasRemaining()) {
+                                armProgressTimeoutLocked(committed);
+                            }
+                        }
+
                         if (committed.buffer.hasRemaining()) {
                             requestDrive();
                             return;
@@ -125,10 +190,12 @@ public final class WebSocketWriteQueue {
                         synchronized (WebSocketWriteQueue.this) {
                             PendingWrite removed = queue.peekFirst();
                             if (removed != committed) {
-                                fail(new IllegalStateException("write queue head changed while committed"));
+                                fail(new IllegalStateException(
+                                        "write queue head changed while committed"));
                                 return;
                             }
                             queue.removeFirst();
+                            cancelProgressTimeoutLocked(committed);
                             committed.state = PendingState.DONE;
                             callback = committed.onWritten;
                         }
@@ -171,14 +238,49 @@ public final class WebSocketWriteQueue {
             notify = !failed;
             failed = true;
             for (PendingWrite pending : queue) {
-                if (pending.state == PendingState.QUEUED) pending.state = PendingState.CANCELLED;
-                else if (pending.state == PendingState.COMMITTED) pending.state = PendingState.FAILED;
+                cancelProgressTimeoutLocked(pending);
+                if (pending.state == PendingState.QUEUED) {
+                    pending.state = PendingState.CANCELLED;
+                } else if (pending.state == PendingState.COMMITTED) {
+                    pending.state = PendingState.FAILED;
+                }
             }
             queue.clear();
             writePending = false;
             driveRequested = false;
         }
         if (notify) onFailure.accept(exc);
+    }
+
+    private void armProgressTimeoutLocked(PendingWrite pending) {
+        if (scheduler == null) return;
+        cancelProgressTimeoutLocked(pending);
+        long generation = ++pending.progressGeneration;
+        pending.progressTimer = scheduler.schedule(
+                writeProgressTimeout,
+                () -> onProgressTimeout(pending, generation));
+    }
+
+    private void cancelProgressTimeoutLocked(PendingWrite pending) {
+        if (pending.progressTimer != null) {
+            pending.progressTimer.cancel();
+            pending.progressTimer = null;
+        }
+    }
+
+    private void onProgressTimeout(
+            PendingWrite pending,
+            long generation) {
+        synchronized (this) {
+            if (failed
+                    || pending.state != PendingState.COMMITTED
+                    || pending.progressGeneration != generation) {
+                return;
+            }
+        }
+        metrics.recordWriteProgressTimeout();
+        fail(new IllegalStateException(
+                "socket write made no progress before deadline"));
     }
 
     private enum PendingState {
@@ -194,6 +296,8 @@ public final class WebSocketWriteQueue {
         private final Runnable onCommitted;
         private final Runnable onWritten;
         private PendingState state = PendingState.QUEUED;
+        private MonotonicScheduler.Handle progressTimer;
+        private long progressGeneration;
 
         private PendingWrite(ByteBuffer buffer, Runnable onCommitted, Runnable onWritten) {
             this.buffer = buffer;

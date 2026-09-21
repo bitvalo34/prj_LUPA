@@ -83,6 +83,9 @@ public final class PublishedImageStore {
     private void rejectSymlinkChain(Path path) throws CatalogException {
         Path normalized = path.toAbsolutePath().normalize();
         ensureInside(normalized, dataRoot);
+        if (Files.isSymbolicLink(dataRoot)) {
+            throw new CatalogException("data root must not be a symbolic link");
+        }
         Path current = dataRoot;
         for (Path segment : dataRoot.relativize(normalized)) {
             current = current.resolve(segment);
