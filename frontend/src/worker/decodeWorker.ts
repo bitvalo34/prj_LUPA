@@ -10,9 +10,16 @@ const queue: WorkerDecodeJob[] = [];
 const minimumEpoch = new Map<number, number>();
 let active = 0;
 let queuedBytes = 0;
+let postDecodeDelayMs = 0;
 
 self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   const message = event.data;
+
+  if (message.type === 'configureDiagnostic') {
+    postDecodeDelayMs = Math.max(0, Math.min(2000, Math.round(message.postDecodeDelayMs)));
+    return;
+  }
+
   if (message.type === 'decode') {
     if (queue.length >= MAX_QUEUED_JOBS || queuedBytes + message.payloadBytes > MAX_QUEUED_BYTES) {
       post({
@@ -94,6 +101,15 @@ async function decode(job: WorkerDecodeJob): Promise<void> {
     const bytes = new Uint8Array(job.buffer, job.payloadOffset, job.payloadBytes);
     const blob = new Blob([bytes], { type: 'image/jpeg' });
     const bitmap = await createImageBitmap(blob);
+
+    /*
+     * I21-only diagnostic hook. Disabled by default. It deliberately widens the race window
+     * after decode but before the second epoch check, without retaining compressed buffers
+     * outside the normal job lifetime or changing production semantics.
+     */
+    if (postDecodeDelayMs > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, postDecodeDelayMs));
+    }
 
     if (bitmap.width !== job.header.w || bitmap.height !== job.header.h) {
       bitmap.close();
