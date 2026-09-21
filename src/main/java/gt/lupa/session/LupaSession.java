@@ -58,8 +58,10 @@ public final class LupaSession implements WebSocketEndpoint {
     private final Map<Integer, DeliveryReservation> deliveries = new LinkedHashMap<>();
     private final Set<TransientBufferBudget.Lease> liveTransientBuffers =
             ConcurrentHashMap.newKeySet();
+    private final Set<MonotonicScheduler.Handle> liveReleaseTimers =
+            ConcurrentHashMap.newKeySet();
     private volatile SessionAdmission.Lease admissionLease;
-    private MonotonicScheduler.Handle helloTimer;
+    private volatile MonotonicScheduler.Handle helloTimer;
     private final int diagnosticSessionId = SESSION_IDS.incrementAndGet();
 
     private volatile Sender sender;
@@ -1132,12 +1134,15 @@ public final class LupaSession implements WebSocketEndpoint {
         cancelReleaseTimer(reservation);
         reservation.releaseDeadlineStartedNanos =
                 scheduler.nowNanos();
-        reservation.releaseTimer = scheduler.schedule(
-                releaseTimeout,
-                () -> submitSerial(
-                        () -> onReleaseTimeout(
-                                reservation.deliveryId),
-                        sender));
+        MonotonicScheduler.Handle timer =
+                scheduler.schedule(
+                        releaseTimeout,
+                        () -> submitSerial(
+                                () -> onReleaseTimeout(
+                                        reservation.deliveryId),
+                                sender));
+        reservation.releaseTimer = timer;
+        liveReleaseTimers.add(timer);
     }
 
     private void onReleaseTimeout(int deliveryId) {
@@ -1198,13 +1203,18 @@ public final class LupaSession implements WebSocketEndpoint {
         MonotonicScheduler.Handle timer =
                 reservation.releaseTimer;
         reservation.releaseTimer = null;
-        if (timer != null) timer.cancel();
+        if (timer != null) {
+            liveReleaseTimers.remove(timer);
+            timer.cancel();
+        }
     }
 
     private void cancelAllReleaseTimers() {
-        for (DeliveryReservation reservation :
-                deliveries.values()) {
-            cancelReleaseTimer(reservation);
+        for (MonotonicScheduler.Handle timer :
+                liveReleaseTimers.toArray(
+                        MonotonicScheduler.Handle[]::new)) {
+            liveReleaseTimers.remove(timer);
+            timer.cancel();
         }
     }
 
