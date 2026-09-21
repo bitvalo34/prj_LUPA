@@ -148,6 +148,19 @@ export class LupaClient {
     this.worker = workerFactory();
     this.worker.addEventListener('message', (event: MessageEvent<WorkerResponse>) => this.onWorker(event.data));
     this.worker.addEventListener('error', () => this.fail('El Worker de decodificación falló'));
+
+    const diagnosticDelayMs = readI21DecodeDelayMs();
+    if (diagnosticDelayMs > 0) {
+      this.worker.postMessage({
+        type: 'configureDiagnostic',
+        postDecodeDelayMs: diagnosticDelayMs
+      });
+      this.trace.push(
+        'LOCAL',
+        'I21_DIAG',
+        'postDecodeDelayMs=' + diagnosticDelayMs + ' (solo diagnóstico local)'
+      );
+    }
   }
 
   subscribe(listener: (snapshot: ClientSnapshot) => void): () => void {
@@ -500,6 +513,14 @@ export class LupaClient {
 
     if (header.epoch < this.epoch) {
       this.discardedTiles++;
+      this.trace.push(
+        'LOCAL',
+        'STALE_TILE',
+        'delivery=' + header.deliveryId +
+          ' epoch=' + header.epoch +
+          ' currentEpoch=' + this.epoch +
+          ' discarded antes del Worker'
+      );
       this.release(header.deliveryId, connectionId, 'discarded');
       this.notifySoon();
       return;
@@ -612,7 +633,14 @@ export class LupaClient {
           this.release(response.deliveryId, response.connectionId, 'failed');
         }
       }
-      this.trace.push('LOCAL', response.type.toUpperCase(), response.reason);
+      this.trace.push(
+        'LOCAL',
+        response.type.toUpperCase(),
+        'delivery=' + response.deliveryId +
+          ' epoch=' + response.epoch +
+          ' connection=' + response.connectionId +
+          ' reason=' + response.reason
+      );
     }
 
     this.updateCompletionPhase();
@@ -909,6 +937,15 @@ export class LupaClient {
     const snapshot = this.snapshot();
     for (const listener of this.listeners) listener(snapshot);
   }
+}
+
+function readI21DecodeDelayMs(): number {
+  if (typeof window === 'undefined') return 0;
+  const raw = new URLSearchParams(window.location.search).get('i21DecodeDelayMs');
+  if (raw === null || raw.trim() === '') return 0;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(2000, Math.round(parsed)));
 }
 
 function summarizeControl(control: Record<string, unknown>): string {

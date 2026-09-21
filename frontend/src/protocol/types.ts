@@ -145,7 +145,16 @@ export interface WorkerReset {
   connectionId: number;
 }
 
-export type WorkerRequest = WorkerDecodeJob | WorkerInvalidate | WorkerReset;
+export interface WorkerDiagnosticConfig {
+  type: 'configureDiagnostic';
+  postDecodeDelayMs: number;
+}
+
+export type WorkerRequest =
+  | WorkerDecodeJob
+  | WorkerInvalidate
+  | WorkerReset
+  | WorkerDiagnosticConfig;
 
 export type WorkerResponse =
   | {

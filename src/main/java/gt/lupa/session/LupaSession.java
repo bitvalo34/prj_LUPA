@@ -26,9 +26,12 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class LupaSession implements WebSocketEndpoint {
     private static final Set<String> RELEASE_STATUSES = Set.of("displayed", "discarded", "failed");
+    private static final boolean I21_DIAGNOSTICS = Boolean.getBoolean("lupa.i21.diag");
+    private static final AtomicInteger SESSION_IDS = new AtomicInteger();
 
     private final PublishedImageStore store;
     private final TileReader tileReader;
@@ -40,6 +43,7 @@ public final class LupaSession implements WebSocketEndpoint {
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicBoolean cleanupScheduled = new AtomicBoolean();
     private final Map<Integer, DeliveryReservation> deliveries = new LinkedHashMap<>();
+    private final int diagnosticSessionId = SESSION_IDS.incrementAndGet();
 
     private volatile Sender sender;
     private LupaSessionState state = LupaSessionState.ESPERA_HELLO;
@@ -105,6 +109,7 @@ public final class LupaSession implements WebSocketEndpoint {
     @Override
     public void onOpen(Sender sender) {
         this.sender = Objects.requireNonNull(sender);
+        diagnostic("OPEN_SOCKET", "state=" + state);
     }
 
     @Override
@@ -121,6 +126,7 @@ public final class LupaSession implements WebSocketEndpoint {
             serial.execute(() -> {
                 state = LupaSessionState.CERRADA;
                 activePlan = null;
+                diagnosticCredits("CLOSE", null, "code=" + code + " reason=" + boundedMessage(reason));
                 deliveries.clear();
                 freeWindowBytes = 0;
             });
@@ -191,6 +197,8 @@ public final class LupaSession implements WebSocketEndpoint {
         freeWindowBytes = negotiatedWindowBytes;
         bitmapBudgetBytes = bitmapBudget;
         state = LupaSessionState.LISTA;
+        diagnosticCredits("HELLO", null,
+                "window=" + negotiatedWindowBytes + " bitmapBudget=" + bitmapBudgetBytes);
 
         ObjectNode welcome = json.mapper().createObjectNode();
         welcome.put("type", "WELCOME");
@@ -284,6 +292,10 @@ public final class LupaSession implements WebSocketEndpoint {
         thumbnailCommittedForOpen = false;
         currentEpoch = epoch;
         state = LupaSessionState.IMAGEN_ABIERTA;
+        diagnosticCredits("OPEN", null,
+                "epoch=" + epoch
+                        + " image=" + candidate.catalogImage().imageId()
+                        + "/" + candidate.catalogImage().imageVersion());
         sendManifest(sender, epoch, candidate.manifest());
     }
 
@@ -336,6 +348,14 @@ public final class LupaSession implements WebSocketEndpoint {
         planControl.put("epoch", epoch);
         planControl.put("appliedLevel", selected.appliedLevel());
         planControl.put("contextLevel", selected.contextLevel());
+        diagnosticCredits("VIEW_PLAN", null,
+                "epoch=" + epoch
+                        + " mode=" + request.mode()
+                        + " offset=" + request.detailOffset()
+                        + " applied=" + selected.appliedLevel()
+                        + " context=" + selected.contextLevel()
+                        + " rect=" + request.rect().x() + "," + request.rect().y()
+                        + "," + request.rect().width() + "x" + request.rect().height());
         sendPlanControl(activePlan, planControl);
     }
 
@@ -393,6 +413,8 @@ public final class LupaSession implements WebSocketEndpoint {
     private void onDoneCommitted(long generation) {
         ActivePlan plan = activePlan;
         if (plan == null || plan.generation != generation) return;
+        diagnosticCredits("DONE", null,
+                "epoch=" + plan.view.epoch() + " sentTiles=" + plan.sentTiles);
         activePlan = null;
     }
 
@@ -411,11 +433,18 @@ public final class LupaSession implements WebSocketEndpoint {
         }
 
         DeliveryReservation reservation = deliveries.remove(deliveryId);
-        if (reservation == null) return;
+        if (reservation == null) {
+            diagnosticCredits("RELEASE_IGNORED", deliveryId, "status=" + status);
+            return;
+        }
 
         reservation.state = DeliveryState.RELEASED;
         freeWindowBytes += reservation.reservedBytes;
         enforceCreditInvariant(sender);
+        diagnosticCredits("RELEASE", deliveryId,
+                "status=" + status
+                        + " epoch=" + reservation.epoch
+                        + " bytes=" + reservation.reservedBytes);
         pump();
     }
 
@@ -537,6 +566,9 @@ public final class LupaSession implements WebSocketEndpoint {
         plan.pendingTile = null;
         plan.busy = true;
         enforceCreditInvariant(sender);
+        diagnosticCredits("RESERVE", deliveryId,
+                "epoch=" + plan.view.epoch()
+                        + " bytes=" + reservationBytes);
         if (closed.get()) return;
 
         WebSocketEndpoint.BinarySend write = sender.sendBinaryTracked(
@@ -665,6 +697,9 @@ public final class LupaSession implements WebSocketEndpoint {
             reservation.state = DeliveryState.CANCELLED;
             freeWindowBytes += reservation.reservedBytes;
             iterator.remove();
+            diagnosticCredits("CANCEL_PRECOMMIT", entry.getKey(),
+                    "epoch=" + reservation.epoch
+                            + " bytes=" + reservation.reservedBytes);
         }
         enforceCreditInvariant(sender);
     }
@@ -744,6 +779,35 @@ public final class LupaSession implements WebSocketEndpoint {
             state = LupaSessionState.CERRADA;
             sender.close(1011, "server session queue is full");
         }
+    }
+
+    private void diagnostic(String event, String detail) {
+        if (!I21_DIAGNOSTICS) return;
+        System.out.printf(
+                "I21_DIAG session=%d event=%s %s%n",
+                diagnosticSessionId,
+                event,
+                detail == null ? "" : detail);
+    }
+
+    private void diagnosticCredits(String event, Integer deliveryId, String detail) {
+        if (!I21_DIAGNOSTICS) return;
+        long reserved = 0;
+        for (DeliveryReservation reservation : deliveries.values()) {
+            reserved += reservation.reservedBytes;
+        }
+        System.out.printf(
+                "I21_DIAG session=%d event=%s%s epoch=%d free=%d reserved=%d pending=%d window=%d invariant=%s %s%n",
+                diagnosticSessionId,
+                event,
+                deliveryId == null ? "" : " delivery=" + deliveryId,
+                currentEpoch,
+                freeWindowBytes,
+                reserved,
+                deliveries.size(),
+                negotiatedWindowBytes,
+                negotiatedWindowBytes == 0 || freeWindowBytes + reserved == negotiatedWindowBytes ? "OK" : "FAIL",
+                detail == null ? "" : detail);
     }
 
     private static String boundedMessage(String message) {
