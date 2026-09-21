@@ -3,6 +3,7 @@ package gt.lupa.session;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.lupa.concurrent.MonotonicScheduler;
 import gt.lupa.concurrent.TileReadAdmission;
 import gt.lupa.concurrent.TransientBufferBudget;
 import gt.lupa.protocol.LupaControlException;
@@ -21,6 +22,7 @@ import gt.lupa.storage.TileReader;
 import gt.lupa.websocket.WebSocketEndpoint;
 
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -45,6 +47,9 @@ public final class LupaSession implements WebSocketEndpoint {
     private final SessionAdmission sessionAdmission;
     private final TileReadAdmission tileReadAdmission;
     private final TransientBufferBudget transientBuffers;
+    private final MonotonicScheduler scheduler;
+    private final Duration helloTimeout;
+    private final Duration releaseTimeout;
     private final SerialExecutor serial;
     private final LupaJson json = new LupaJson();
     private final ViewPlanner viewPlanner = new ViewPlanner();
@@ -54,6 +59,7 @@ public final class LupaSession implements WebSocketEndpoint {
     private final Set<TransientBufferBudget.Lease> liveTransientBuffers =
             ConcurrentHashMap.newKeySet();
     private volatile SessionAdmission.Lease admissionLease;
+    private MonotonicScheduler.Handle helloTimer;
     private final int diagnosticSessionId = SESSION_IDS.incrementAndGet();
 
     private volatile Sender sender;
@@ -95,15 +101,19 @@ public final class LupaSession implements WebSocketEndpoint {
             Executor stateExecutor,
             Executor diskExecutor,
             Executor metadataExecutor) {
-        this.store = Objects.requireNonNull(store);
-        this.tileReader = Objects.requireNonNull(tileReader);
-        this.diskExecutor = Objects.requireNonNull(diskExecutor);
-        this.metadataExecutor = Objects.requireNonNull(metadataExecutor);
-        this.sessionAdmission = null;
-        this.tileReadAdmission = null;
-        this.transientBuffers = null;
-        this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
-        this.deliveryIds = new DeliveryIdSequence();
+        this(
+                store,
+                tileReader,
+                stateExecutor,
+                diskExecutor,
+                metadataExecutor,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new DeliveryIdSequence());
     }
 
     public LupaSession(
@@ -113,15 +123,19 @@ public final class LupaSession implements WebSocketEndpoint {
             Executor diskExecutor,
             Executor metadataExecutor,
             SessionAdmission sessionAdmission) {
-        this.store = Objects.requireNonNull(store);
-        this.tileReader = Objects.requireNonNull(tileReader);
-        this.diskExecutor = Objects.requireNonNull(diskExecutor);
-        this.metadataExecutor = Objects.requireNonNull(metadataExecutor);
-        this.sessionAdmission = Objects.requireNonNull(sessionAdmission);
-        this.tileReadAdmission = null;
-        this.transientBuffers = null;
-        this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
-        this.deliveryIds = new DeliveryIdSequence();
+        this(
+                store,
+                tileReader,
+                stateExecutor,
+                diskExecutor,
+                metadataExecutor,
+                Objects.requireNonNull(sessionAdmission),
+                null,
+                null,
+                null,
+                null,
+                null,
+                new DeliveryIdSequence());
     }
 
     public LupaSession(
@@ -133,15 +147,46 @@ public final class LupaSession implements WebSocketEndpoint {
             SessionAdmission sessionAdmission,
             TileReadAdmission tileReadAdmission,
             TransientBufferBudget transientBuffers) {
-        this.store = Objects.requireNonNull(store);
-        this.tileReader = Objects.requireNonNull(tileReader);
-        this.diskExecutor = Objects.requireNonNull(diskExecutor);
-        this.metadataExecutor = Objects.requireNonNull(metadataExecutor);
-        this.sessionAdmission = Objects.requireNonNull(sessionAdmission);
-        this.tileReadAdmission = Objects.requireNonNull(tileReadAdmission);
-        this.transientBuffers = Objects.requireNonNull(transientBuffers);
-        this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
-        this.deliveryIds = new DeliveryIdSequence();
+        this(
+                store,
+                tileReader,
+                stateExecutor,
+                diskExecutor,
+                metadataExecutor,
+                Objects.requireNonNull(sessionAdmission),
+                Objects.requireNonNull(tileReadAdmission),
+                Objects.requireNonNull(transientBuffers),
+                null,
+                null,
+                null,
+                new DeliveryIdSequence());
+    }
+
+    public LupaSession(
+            PublishedImageStore store,
+            TileReader tileReader,
+            Executor stateExecutor,
+            Executor diskExecutor,
+            Executor metadataExecutor,
+            SessionAdmission sessionAdmission,
+            TileReadAdmission tileReadAdmission,
+            TransientBufferBudget transientBuffers,
+            MonotonicScheduler scheduler,
+            Duration helloTimeout,
+            Duration releaseTimeout) {
+        this(
+                store,
+                tileReader,
+                stateExecutor,
+                diskExecutor,
+                metadataExecutor,
+                Objects.requireNonNull(sessionAdmission),
+                Objects.requireNonNull(tileReadAdmission),
+                Objects.requireNonNull(transientBuffers),
+                Objects.requireNonNull(scheduler),
+                requirePositive(helloTimeout, "helloTimeout"),
+                requirePositive(releaseTimeout, "releaseTimeout"),
+                new DeliveryIdSequence());
     }
 
     LupaSession(
@@ -151,21 +196,60 @@ public final class LupaSession implements WebSocketEndpoint {
             Executor diskExecutor,
             Executor metadataExecutor,
             long firstDeliveryId) {
+        this(
+                store,
+                tileReader,
+                stateExecutor,
+                diskExecutor,
+                metadataExecutor,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                new DeliveryIdSequence(firstDeliveryId));
+    }
+
+    private LupaSession(
+            PublishedImageStore store,
+            TileReader tileReader,
+            Executor stateExecutor,
+            Executor diskExecutor,
+            Executor metadataExecutor,
+            SessionAdmission sessionAdmission,
+            TileReadAdmission tileReadAdmission,
+            TransientBufferBudget transientBuffers,
+            MonotonicScheduler scheduler,
+            Duration helloTimeout,
+            Duration releaseTimeout,
+            DeliveryIdSequence deliveryIds) {
         this.store = Objects.requireNonNull(store);
         this.tileReader = Objects.requireNonNull(tileReader);
         this.diskExecutor = Objects.requireNonNull(diskExecutor);
         this.metadataExecutor = Objects.requireNonNull(metadataExecutor);
-        this.sessionAdmission = null;
-        this.tileReadAdmission = null;
-        this.transientBuffers = null;
+        this.sessionAdmission = sessionAdmission;
+        this.tileReadAdmission = tileReadAdmission;
+        this.transientBuffers = transientBuffers;
+        this.scheduler = scheduler;
+        this.helloTimeout = helloTimeout;
+        this.releaseTimeout = releaseTimeout;
         this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
-        this.deliveryIds = new DeliveryIdSequence(firstDeliveryId);
+        this.deliveryIds = Objects.requireNonNull(deliveryIds);
     }
 
     @Override
     public void onOpen(Sender sender) {
         this.sender = Objects.requireNonNull(sender);
         diagnostic("OPEN_SOCKET", "state=" + state);
+
+        if (scheduler != null) {
+            helloTimer = scheduler.schedule(
+                    helloTimeout,
+                    () -> submitSerial(
+                            this::onHelloTimeout,
+                            this.sender));
+        }
     }
 
     @Override
@@ -177,6 +261,8 @@ public final class LupaSession implements WebSocketEndpoint {
     @Override
     public void onClosed(int code, String reason) {
         closed.set(true);
+        cancelHelloTimer();
+        cancelAllReleaseTimers();
         releaseAdmission();
         releaseAllTransientBuffers();
         if (!cleanupScheduled.compareAndSet(false, true)) return;
@@ -277,6 +363,7 @@ public final class LupaSession implements WebSocketEndpoint {
             admissionLease = lease;
         }
 
+        cancelHelloTimer();
         negotiatedWindowBytes = (int) Math.min(requestedWindow, LupaProtocol.MAX_WINDOW_BYTES);
         freeWindowBytes = negotiatedWindowBytes;
         bitmapBudgetBytes = bitmapBudget;
@@ -522,6 +609,7 @@ public final class LupaSession implements WebSocketEndpoint {
             return;
         }
 
+        cancelReleaseTimer(reservation);
         reservation.state = DeliveryState.RELEASED;
         freeWindowBytes += reservation.reservedBytes;
         enforceCreditInvariant(sender);
@@ -910,6 +998,7 @@ public final class LupaSession implements WebSocketEndpoint {
                 && (reservation.state == DeliveryState.COMMITTED
                     || reservation.state == DeliveryState.RESERVED_QUEUED)) {
             reservation.state = DeliveryState.WRITTEN_AWAITING_RELEASE;
+            armReleaseTimer(reservation);
         }
 
         ActivePlan plan = activePlan;
@@ -1016,6 +1105,7 @@ public final class LupaSession implements WebSocketEndpoint {
             WebSocketEndpoint.BinarySend write = reservation.write;
             if (write == null || !write.cancelIfNotCommitted()) continue;
 
+            cancelReleaseTimer(reservation);
             reservation.state = DeliveryState.CANCELLED;
             freeWindowBytes += reservation.reservedBytes;
             releaseTransientBuffer(reservation.transientBuffer);
@@ -1025,6 +1115,108 @@ public final class LupaSession implements WebSocketEndpoint {
                             + " bytes=" + reservation.reservedBytes);
         }
         enforceCreditInvariant(sender);
+    }
+
+    private void onHelloTimeout() {
+        if (closed.get()
+                || state != LupaSessionState.ESPERA_HELLO) {
+            return;
+        }
+        closeForTimeout("HELLO timeout");
+    }
+
+    private void armReleaseTimer(
+            DeliveryReservation reservation) {
+        if (scheduler == null || releaseTimeout == null) return;
+
+        cancelReleaseTimer(reservation);
+        reservation.releaseDeadlineStartedNanos =
+                scheduler.nowNanos();
+        reservation.releaseTimer = scheduler.schedule(
+                releaseTimeout,
+                () -> submitSerial(
+                        () -> onReleaseTimeout(
+                                reservation.deliveryId),
+                        sender));
+    }
+
+    private void onReleaseTimeout(int deliveryId) {
+        DeliveryReservation reservation =
+                deliveries.get(deliveryId);
+
+        if (closed.get()
+                || reservation == null
+                || reservation.state
+                        != DeliveryState.WRITTEN_AWAITING_RELEASE) {
+            return;
+        }
+
+        diagnosticCredits(
+                "RELEASE_TIMEOUT",
+                deliveryId,
+                "epoch=" + reservation.epoch
+                        + " startedNanos="
+                        + reservation.releaseDeadlineStartedNanos);
+
+        closeForTimeout(
+                "delivery " + deliveryId
+                        + " RELEASE timeout");
+    }
+
+    private void closeForTimeout(String reason) {
+        if (!closed.compareAndSet(false, true)) return;
+
+        state = LupaSessionState.CERRADA;
+        cancelHelloTimer();
+
+        ActivePlan closingPlan = activePlan;
+        activePlan = null;
+        discardPlanResources(closingPlan);
+
+        cancelAllReleaseTimers();
+        releaseAllTransientBuffers();
+        deliveries.clear();
+        freeWindowBytes = 0;
+        releaseAdmission();
+
+        Sender current = sender;
+        if (current != null) {
+            current.close(
+                    1008,
+                    boundedMessage(reason));
+        }
+    }
+
+    private void cancelHelloTimer() {
+        MonotonicScheduler.Handle timer = helloTimer;
+        helloTimer = null;
+        if (timer != null) timer.cancel();
+    }
+
+    private void cancelReleaseTimer(
+            DeliveryReservation reservation) {
+        MonotonicScheduler.Handle timer =
+                reservation.releaseTimer;
+        reservation.releaseTimer = null;
+        if (timer != null) timer.cancel();
+    }
+
+    private void cancelAllReleaseTimers() {
+        for (DeliveryReservation reservation :
+                deliveries.values()) {
+            cancelReleaseTimer(reservation);
+        }
+    }
+
+    private static Duration requirePositive(
+            Duration value,
+            String name) {
+        Objects.requireNonNull(value);
+        if (value.isZero() || value.isNegative()) {
+            throw new IllegalArgumentException(
+                    name + " must be positive");
+        }
+        return value;
     }
 
     private void discardPendingTile(ActivePlan plan) {
@@ -1244,6 +1436,8 @@ public final class LupaSession implements WebSocketEndpoint {
         private final TransientBufferBudget.Lease transientBuffer;
         private DeliveryState state = DeliveryState.RESERVED_QUEUED;
         private WebSocketEndpoint.BinarySend write;
+        private MonotonicScheduler.Handle releaseTimer;
+        private long releaseDeadlineStartedNanos;
 
         private DeliveryReservation(
                 int deliveryId,

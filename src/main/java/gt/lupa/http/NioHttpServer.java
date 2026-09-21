@@ -287,6 +287,9 @@ public final class NioHttpServer implements AutoCloseable {
                     endpoint,
                     timers,
                     config.webSocketCloseTimeout(),
+                    config.pingInterval(),
+                    config.pongTimeout(),
+                    config.writeProgressTimeout(),
                     this::finish).start(trailing);
         }
 

@@ -16,6 +16,11 @@ public final class WebSocketFrames {
         return encode(0x2, payload, true);
     }
 
+    public static ByteBuffer ping(byte[] payload) {
+        if (payload.length > 125) throw new IllegalArgumentException("ping payload must be <= 125 bytes");
+        return encode(0x9, payload, true);
+    }
+
     public static ByteBuffer pong(byte[] payload) {
         if (payload.length > 125) throw new IllegalArgumentException("pong payload must be <= 125 bytes");
         return encode(0xA, payload, true);

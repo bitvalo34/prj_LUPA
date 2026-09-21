@@ -1,5 +1,7 @@
 package gt.lupa.websocket;
 
+import gt.lupa.concurrent.MonotonicScheduler;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousSocketChannel;
@@ -26,6 +28,7 @@ public final class WebSocketConnection {
     private final ScheduledExecutorService timers;
     private final Duration closeTimeout;
     private final Runnable onClosed;
+    private final WebSocketHeartbeat heartbeat;
     private final ByteBuffer readBuffer = ByteBuffer.allocate(READ_BUFFER_BYTES);
     private final WebSocketWriteQueue writes;
     private final AtomicBoolean finished = new AtomicBoolean();
@@ -42,25 +45,73 @@ public final class WebSocketConnection {
             ScheduledExecutorService timers,
             Duration closeTimeout,
             Runnable onClosed) {
+        this(
+                socket,
+                endpoint,
+                timers,
+                closeTimeout,
+                Duration.ofDays(365),
+                Duration.ofDays(365),
+                null,
+                onClosed);
+    }
+
+    public WebSocketConnection(
+            AsynchronousSocketChannel socket,
+            WebSocketEndpoint endpoint,
+            ScheduledExecutorService timers,
+            Duration closeTimeout,
+            Duration pingInterval,
+            Duration pongTimeout,
+            Duration writeProgressTimeout,
+            Runnable onClosed) {
         this.socket = Objects.requireNonNull(socket);
         this.endpoint = Objects.requireNonNull(endpoint);
         this.timers = Objects.requireNonNull(timers);
         this.closeTimeout = Objects.requireNonNull(closeTimeout);
         this.onClosed = Objects.requireNonNull(onClosed);
-        this.parser = new WebSocketFrameParser(MAX_CLIENT_MESSAGE_BYTES);
-        this.textAssembler = new WebSocketTextAssembler(MAX_CLIENT_MESSAGE_BYTES);
-        this.writes = new WebSocketWriteQueue(
-                (buffer, handler) -> socket.write(buffer, null, handler),
-                MAX_QUEUED_FRAMES,
-                ignored -> finish());
+
+        MonotonicScheduler scheduler =
+                MonotonicScheduler.system(timers);
+
+        this.parser =
+                new WebSocketFrameParser(MAX_CLIENT_MESSAGE_BYTES);
+        this.textAssembler =
+                new WebSocketTextAssembler(MAX_CLIENT_MESSAGE_BYTES);
+
+        this.writes = writeProgressTimeout == null
+                ? new WebSocketWriteQueue(
+                        (buffer, handler) -> socket.write(buffer, null, handler),
+                        MAX_QUEUED_FRAMES,
+                        ignored -> finish())
+                : new WebSocketWriteQueue(
+                        (buffer, handler) -> socket.write(buffer, null, handler),
+                        MAX_QUEUED_FRAMES,
+                        scheduler,
+                        writeProgressTimeout,
+                        ignored -> fail(
+                                1011,
+                                "WebSocket write made no progress"));
+
+        this.heartbeat = new WebSocketHeartbeat(
+                scheduler,
+                pingInterval,
+                pongTimeout,
+                this::sendPing,
+                () -> fail(1001, "WebSocket pong timeout"));
     }
 
     public void start(byte[] initialBytes) {
         if (finished.get()) return;
         try {
             endpoint.onOpen(new SenderImpl());
-            if (initialBytes != null && initialBytes.length > 0) process(ByteBuffer.wrap(initialBytes));
-            if (!finished.get()) readNext();
+            if (initialBytes != null && initialBytes.length > 0) {
+                process(ByteBuffer.wrap(initialBytes));
+            }
+            if (!finished.get()) {
+                heartbeat.start();
+                readNext();
+            }
         } catch (RuntimeException e) {
             fail(1011, "endpoint failed during open");
         }
@@ -115,8 +166,11 @@ public final class WebSocketConnection {
     private void handle(WebSocketFrame frame) throws WebSocketProtocolException {
         switch (frame.opcode()) {
             case 0x8 -> receiveClose(frame.payloadUnsafe());
-            case 0x9 -> sendControl(WebSocketFrames.pong(frame.payloadUnsafe()));
-            case 0xA -> { }
+            case 0x9 ->
+                    sendControl(
+                            WebSocketFrames.pong(frame.payloadUnsafe()));
+            case 0xA ->
+                    heartbeat.onPong(frame.payloadUnsafe());
             case 0x0, 0x1, 0x2 -> receiveData(frame);
             default -> throw new WebSocketProtocolException(1002, "unsupported opcode");
         }
@@ -159,7 +213,27 @@ public final class WebSocketConnection {
 
     private void sendControl(ByteBuffer frame) {
         if (finished.get()) return;
-        if (!writes.enqueue(frame, () -> {})) fail(1011, "WebSocket write queue is full");
+        if (!writes.enqueue(frame, () -> {})) {
+            fail(1011, "WebSocket write queue is full");
+        }
+    }
+
+    private boolean sendPing(
+            byte[] payload,
+            Runnable onWritten) {
+        if (finished.get()) return false;
+        synchronized (stateLock) {
+            if (closeSent || closeReceived) return false;
+        }
+
+        boolean accepted =
+                writes.enqueue(
+                        WebSocketFrames.ping(payload),
+                        onWritten);
+        if (!accepted) {
+            fail(1011, "WebSocket write queue is full");
+        }
+        return accepted;
     }
 
     private void initiateClose(int code, String reason) {
@@ -209,6 +283,7 @@ public final class WebSocketConnection {
         if (!finished.compareAndSet(false, true)) return;
         ScheduledFuture<?> timer = closeTimer;
         if (timer != null) timer.cancel(false);
+        heartbeat.close();
         try {
             socket.close();
         } catch (IOException ignored) {
