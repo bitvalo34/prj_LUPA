@@ -4,18 +4,25 @@ import {
   MAX_EPOCH,
   REQUESTED_WINDOW_BYTES,
   type CatalogImage,
+  type FocusPoint,
   type Manifest,
   type Plan,
   type ReleaseStatus,
+  type ViewMode,
   type ViewLayout,
   type Welcome,
   type WorkerResponse
 } from '../protocol/types';
 import {
+  canvasPointToImage,
   centeredTestRegion,
   computeFitLayout,
   fullViewRect,
-  viewportForRect,
+  integerViewRect,
+  panViewRect,
+  viewportForNavigation,
+  viewZoom,
+  zoomViewRect,
   type ViewRect
 } from '../protocol/viewMath';
 import { parseTileEnvelopeBase, validateTileAgainstManifest } from '../protocol/tileEnvelope';
@@ -31,6 +38,7 @@ import { BitmapBudget } from './BitmapBudget';
 import { CanvasCompositor } from './CanvasCompositor';
 import { DeliveryLedger } from './DeliveryLedger';
 import { TraceBuffer, type TraceEntry } from './TraceBuffer';
+import { sha256Hex } from './tileDigest';
 import type { LupaTransport } from './transport';
 import { WebSocketTransport } from './WebSocketTransport';
 import { deriveTransferPhase } from './state';
@@ -64,6 +72,10 @@ export interface ClientSnapshot {
   doneSentTiles: number | null;
   managedBitmapBytes: number;
   activeViewRect: ViewRect | null;
+  viewMode: ViewMode;
+  detailOffset: -2 | -1 | 0;
+  focus: FocusPoint | null;
+  zoom: number;
   error: string | null;
   trace: TraceEntry[];
 }
@@ -75,6 +87,16 @@ interface PendingDecode {
   bytes: number;
   kind: 'context' | 'detail';
 }
+
+interface ActiveViewIntent {
+  epoch: number;
+  mode: ViewMode;
+  detailOffset: -2 | -1 | 0;
+  focus: FocusPoint | null;
+}
+
+const NAVIGATION_INTERVAL_MS = 100;
+const NAVIGATION_SETTLE_MS = 200;
 
 export class LupaClient {
   private transport: LupaTransport | null = null;
@@ -95,8 +117,16 @@ export class LupaClient {
   private viewport: { width: number; height: number; dpr: number } | null = null;
   private layout: ViewLayout | null = null;
   private activeViewRect: ViewRect | null = null;
+  private viewMode: ViewMode = 'uniform';
+  private detailOffset: -2 | -1 | 0 = 0;
+  private focus: FocusPoint | null = null;
+  private activeIntent: ActiveViewIntent | null = null;
   private firstTileHashRecorded = false;
   private resizeTimer = 0;
+  private navigationTimer = 0;
+  private settleTimer = 0;
+  private lastNavigationSentAt = 0;
+  private lastViewSignature = '';
   private notifyTimer = 0;
   private phase: ViewerPhase = 'disconnected';
   private error: string | null = null;
@@ -129,11 +159,19 @@ export class LupaClient {
   attachCanvas(canvas: HTMLCanvasElement): void {
     this.compositor?.destroy();
     this.compositor = new CanvasCompositor(canvas, (kind, bytes) => this.budget.removeStored(kind, bytes));
-    if (this.manifest && this.layout) this.compositor.startImage(this.manifest, this.layout);
+    if (this.manifest && this.layout && this.activeViewRect) {
+      this.compositor.startImage(this.manifest, this.layout, this.activeViewRect, this.visibleFocus());
+    }
   }
 
   connect(): void {
     if (this.destroyed) return;
+    window.clearTimeout(this.resizeTimer);
+    window.clearTimeout(this.navigationTimer);
+    window.clearTimeout(this.settleTimer);
+    this.navigationTimer = 0;
+    this.settleTimer = 0;
+    this.lastNavigationSentAt = 0;
     this.transport?.close(1000, 'reconnect');
     this.connectionId++;
     this.epoch = 0;
@@ -144,6 +182,9 @@ export class LupaClient {
     this.serverDone = false;
     this.doneSentTiles = null;
     this.activeViewRect = null;
+    this.focus = null;
+    this.activeIntent = null;
+    this.lastViewSignature = '';
     this.firstTileHashRecorded = false;
     this.error = null;
     this.phase = 'connecting';
@@ -212,9 +253,10 @@ export class LupaClient {
 
     this.layout = computeFitLayout(this.manifest.width, this.manifest.height, width, height, dpr);
     this.compositor?.setLayout(this.layout);
+    if (this.activeViewRect) this.compositor?.setView(this.activeViewRect, this.visibleFocus());
 
     if (!previous) {
-      this.requestView(this.activeViewRect ?? fullViewRect(this.manifest));
+      this.requestView(this.activeViewRect ?? fullViewRect(this.manifest), this.detailOffset);
       return;
     }
     const changed =
@@ -225,7 +267,7 @@ export class LupaClient {
 
     window.clearTimeout(this.resizeTimer);
     this.resizeTimer = window.setTimeout(
-      () => this.requestView(this.activeViewRect ?? fullViewRect(this.manifest!)),
+      () => this.requestView(this.activeViewRect ?? fullViewRect(this.manifest!), this.detailOffset),
       180
     );
   }
@@ -239,7 +281,7 @@ export class LupaClient {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'lupa-a20-trace-' + new Date().toISOString().replace(/[:.]/g, '-') + '.txt';
+    anchor.download = 'lupa-a21-trace-' + new Date().toISOString().replace(/[:.]/g, '-') + '.txt';
     anchor.click();
     URL.revokeObjectURL(url);
   }
@@ -264,6 +306,10 @@ export class LupaClient {
       doneSentTiles: this.doneSentTiles,
       managedBitmapBytes: this.budget.snapshot().managedBytes,
       activeViewRect: this.activeViewRect ? { ...this.activeViewRect } : null,
+      viewMode: this.viewMode,
+      detailOffset: this.detailOffset,
+      focus: this.focus ? { ...this.focus } : null,
+      zoom: this.manifest && this.activeViewRect ? viewZoom(this.manifest, this.activeViewRect) : 1,
       error: this.error,
       trace: this.trace.snapshot()
     };
@@ -272,6 +318,8 @@ export class LupaClient {
   destroy(): void {
     this.destroyed = true;
     window.clearTimeout(this.resizeTimer);
+    window.clearTimeout(this.navigationTimer);
+    window.clearTimeout(this.settleTimer);
     window.clearTimeout(this.notifyTimer);
     this.transport?.close(1000, 'viewer destroy');
     this.worker.terminate();
@@ -280,6 +328,10 @@ export class LupaClient {
   }
 
   private cleanupConnection(connectionId: number): void {
+    window.clearTimeout(this.navigationTimer);
+    window.clearTimeout(this.settleTimer);
+    this.navigationTimer = 0;
+    this.settleTimer = 0;
     this.worker.postMessage({ type: 'reset', connectionId });
     for (const [jobId, pending] of this.pending) {
       if (pending.connectionId === connectionId) {
@@ -292,6 +344,9 @@ export class LupaClient {
     this.ledger.clear();
     this.manifest = null;
     this.activeViewRect = null;
+    this.focus = null;
+    this.activeIntent = null;
+    this.lastViewSignature = '';
     this.firstTileHashRecorded = false;
     this.plan = null;
     this.welcome = null;
@@ -335,6 +390,8 @@ export class LupaClient {
           this.serverDone = false;
           this.doneSentTiles = null;
           this.phase = 'opening';
+          this.activeViewRect = fullViewRect(manifest);
+          if (this.viewMode === 'focus') this.focus = this.centerFocus(this.activeViewRect);
           if (this.viewport) {
             this.layout = computeFitLayout(
               manifest.width,
@@ -343,9 +400,8 @@ export class LupaClient {
               this.viewport.height,
               this.viewport.dpr
             );
-            this.compositor?.startImage(manifest, this.layout);
-            this.activeViewRect = fullViewRect(manifest);
-            this.requestView(this.activeViewRect);
+            this.compositor?.startImage(manifest, this.layout, this.activeViewRect, this.visibleFocus());
+            this.requestView(this.activeViewRect, this.detailOffset);
           }
           this.emitNow();
           return;
@@ -387,7 +443,10 @@ export class LupaClient {
             this.trace.push('LOCAL', 'STALE_ERROR', 'epoch=' + remote.epoch + ' code=' + remote.code);
             return;
           }
-          this.fail(remote.code + ': ' + remote.message);
+          this.error = remote.code + ': ' + remote.message;
+          this.trace.push('LOCAL', 'REMOTE_ERROR', this.error);
+          this.updateCompletionPhase();
+          this.emitNow();
           return;
         }
         default:
@@ -424,17 +483,13 @@ export class LupaClient {
     if (!this.firstTileHashRecorded) {
       this.firstTileHashRecorded = true;
       const copy = tile.buffer.slice(tile.payloadOffset, tile.payloadOffset + tile.payloadBytes);
-      void crypto.subtle.digest('SHA-256', copy).then((digest) => {
-        const hash = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join('');
-        this.trace.push(
-          'LOCAL',
-          'TILE_SHA256',
-          'delivery=' + header.deliveryId + ' z=' + header.z + ' x=' + header.x + ' y=' + header.y +
+      void sha256Hex(copy).then((hash) => {
+        const detail = hash
+          ? 'delivery=' + header.deliveryId + ' z=' + header.z + ' x=' + header.x + ' y=' + header.y +
             ' bytes=' + header.payloadBytes + ' sha256=' + hash
-        );
+          : 'delivery=' + header.deliveryId + ' digest no disponible en este contexto';
+        this.trace.push('LOCAL', 'TILE_SHA256', detail);
         this.notifySoon();
-      }).catch(() => {
-        this.trace.push('LOCAL', 'TILE_SHA256', 'digest no disponible');
       });
     }
 
@@ -469,7 +524,7 @@ export class LupaClient {
       connectionId,
       epoch: header.epoch,
       bytes: decodedBytes,
-      kind: header.z === 0 ? 'context' : 'detail'
+      kind: this.classifyTile(header.epoch, header.z)
     });
     this.phase = 'processing';
     this.worker.postMessage(
@@ -522,6 +577,7 @@ export class LupaClient {
             response.header,
             response.bitmap,
             bytes,
+            pending.kind,
             () => {
               this.pendingPresentations = Math.max(0, this.pendingPresentations - 1);
               this.drawnTiles++;
@@ -586,10 +642,17 @@ export class LupaClient {
 
   private openSelected(): void {
     if (!this.selected) return;
+    window.clearTimeout(this.navigationTimer);
+    window.clearTimeout(this.settleTimer);
+    this.navigationTimer = 0;
+    this.settleTimer = 0;
     const epoch = this.nextEpoch();
     if (epoch === null) return;
     this.manifest = null;
     this.activeViewRect = null;
+    this.focus = null;
+    this.activeIntent = null;
+    this.lastViewSignature = '';
     this.plan = null;
     this.serverDone = false;
     this.doneSentTiles = null;
@@ -603,25 +666,156 @@ export class LupaClient {
   requestCenteredIntegrationRegion(): void {
     if (!this.manifest) return;
     const rect = centeredTestRegion(this.manifest);
-    this.requestView(rect);
+    this.activeViewRect = rect;
+    this.compositor?.setView(rect, this.visibleFocus());
+    this.requestView(rect, this.detailOffset);
   }
 
   requestFullView(): void {
-    if (!this.manifest) return;
-    this.requestView(fullViewRect(this.manifest));
+    this.resetView();
   }
 
-  private requestView(rect: ViewRect): void {
+  resetView(): void {
+    if (!this.manifest) return;
+    const rect = fullViewRect(this.manifest);
+    this.activeViewRect = rect;
+    if (this.viewMode === 'focus') this.focus = this.centerFocus(rect);
+    this.compositor?.setView(rect, this.visibleFocus());
+    this.requestView(rect, this.detailOffset);
+  }
+
+  setViewMode(mode: ViewMode): void {
+    if (mode !== 'uniform' && mode !== 'focus') return;
+    this.viewMode = mode;
+    if (mode === 'focus' && this.activeViewRect && !this.focus) {
+      this.focus = this.centerFocus(this.activeViewRect);
+    }
+    if (this.activeViewRect) {
+      this.compositor?.setView(this.activeViewRect, this.visibleFocus());
+      this.requestView(this.activeViewRect, this.detailOffset);
+    }
+    this.emitNow();
+  }
+
+  setDetailOffset(offset: -2 | -1 | 0): void {
+    if (offset !== -2 && offset !== -1 && offset !== 0) return;
+    this.detailOffset = offset;
+    if (this.activeViewRect) this.requestView(this.activeViewRect, offset);
+    this.emitNow();
+  }
+
+  setFocusRadius(radiusPx: number): void {
+    const radius = Math.round(Math.min(512, Math.max(32, radiusPx)));
+    if (this.focus) this.focus = { ...this.focus, radiusPx: radius };
+    else if (this.activeViewRect) this.focus = { ...this.centerFocus(this.activeViewRect), radiusPx: radius };
+    if (this.activeViewRect) {
+      this.compositor?.setView(this.activeViewRect, this.visibleFocus());
+      if (this.viewMode === 'focus') this.queueNavigationView();
+    }
+    this.emitNow();
+  }
+
+  focusAtCss(cssX: number, cssY: number): void {
+    if (this.viewMode !== 'focus' || !this.manifest || !this.layout || !this.activeViewRect) return;
+    const point = canvasPointToImage(this.layout, this.activeViewRect, cssX, cssY);
+    if (!point) return;
+    this.focus = {
+      x: Math.max(0, Math.min(this.manifest.width - 1, Math.round(point.x))),
+      y: Math.max(0, Math.min(this.manifest.height - 1, Math.round(point.y))),
+      radiusPx: this.focus?.radiusPx ?? 144
+    };
+    this.compositor?.setView(this.activeViewRect, this.focus);
+    this.requestView(this.activeViewRect, this.detailOffset);
+    this.emitNow();
+  }
+
+  panByCss(deltaCssX: number, deltaCssY: number): void {
+    if (!this.manifest || !this.layout || !this.activeViewRect) return;
+    const image = this.layout.imageRectPx;
+    const deltaX = -deltaCssX * this.layout.effectiveDpr * this.activeViewRect.width / image.width;
+    const deltaY = -deltaCssY * this.layout.effectiveDpr * this.activeViewRect.height / image.height;
+    const rect = panViewRect(this.manifest, this.activeViewRect, deltaX, deltaY);
+    this.updateNavigationRect(rect);
+  }
+
+  panByFraction(xFraction: number, yFraction: number): void {
+    if (!this.manifest || !this.activeViewRect) return;
+    const rect = panViewRect(
+      this.manifest,
+      this.activeViewRect,
+      this.activeViewRect.width * xFraction,
+      this.activeViewRect.height * yFraction
+    );
+    this.updateNavigationRect(rect);
+  }
+
+  zoomAtCss(cssX: number, cssY: number, factor: number): void {
+    if (!this.manifest || !this.layout || !this.activeViewRect) return;
+    const anchor = canvasPointToImage(this.layout, this.activeViewRect, cssX, cssY) ?? {
+      x: this.activeViewRect.x + this.activeViewRect.width / 2,
+      y: this.activeViewRect.y + this.activeViewRect.height / 2
+    };
+    this.updateNavigationRect(zoomViewRect(this.manifest, this.activeViewRect, anchor, factor));
+  }
+
+  zoomBy(factor: number): void {
+    if (!this.manifest || !this.activeViewRect) return;
+    const anchor = {
+      x: this.activeViewRect.x + this.activeViewRect.width / 2,
+      y: this.activeViewRect.y + this.activeViewRect.height / 2
+    };
+    this.updateNavigationRect(zoomViewRect(this.manifest, this.activeViewRect, anchor, factor));
+  }
+
+  private updateNavigationRect(rect: ViewRect): void {
+    if (!this.manifest) return;
+    const integerRect = integerViewRect(this.manifest, rect);
+    this.activeViewRect = integerRect;
+    this.compositor?.setView(integerRect, this.visibleFocus());
+    this.queueNavigationView();
+    this.emitNow();
+  }
+
+  private queueNavigationView(): void {
+    if (!this.activeViewRect) return;
+    const now = Date.now();
+    const elapsed = now - this.lastNavigationSentAt;
+    const sendTransient = () => {
+      this.navigationTimer = 0;
+      this.lastNavigationSentAt = Date.now();
+      if (this.activeViewRect) this.requestView(this.activeViewRect, Math.min(this.detailOffset, -1) as -2 | -1);
+    };
+
+    window.clearTimeout(this.navigationTimer);
+    if (elapsed >= NAVIGATION_INTERVAL_MS) sendTransient();
+    else this.navigationTimer = window.setTimeout(sendTransient, NAVIGATION_INTERVAL_MS - elapsed);
+
+    window.clearTimeout(this.settleTimer);
+    this.settleTimer = window.setTimeout(() => {
+      this.settleTimer = 0;
+      if (this.activeViewRect) this.requestView(this.activeViewRect, this.detailOffset);
+    }, NAVIGATION_SETTLE_MS);
+  }
+
+  private requestView(rect: ViewRect, detailOffset: -2 | -1 | 0): void {
     if (!this.manifest || !this.layout || !this.selected || !this.transport?.isOpen) return;
-    const viewportPx = viewportForRect(this.manifest, this.layout, rect);
+    rect = integerViewRect(this.manifest, rect);
+    const focus = this.viewMode === 'focus' ? (this.focus ?? this.centerFocus(rect)) : null;
+    if (this.viewMode === 'focus' && !this.focus) this.focus = focus;
+    const viewportPx = viewportForNavigation(this.layout);
+    const signature = JSON.stringify({ rect, viewportPx, detailOffset, mode: this.viewMode, focus });
+    if (signature === this.lastViewSignature) return;
     const epoch = this.nextEpoch();
     if (epoch === null) return;
+    this.lastViewSignature = signature;
     this.serverDone = false;
     this.doneSentTiles = null;
     this.plan = null;
+    this.error = null;
     this.activeViewRect = { ...rect };
+    this.activeIntent = { epoch, mode: this.viewMode, detailOffset, focus };
     this.worker.postMessage({ type: 'invalidate', connectionId: this.connectionId, minEpoch: epoch });
-    this.compositor?.beginEpoch(epoch);
+    this.compositor?.beginEpoch(epoch, rect, focus);
     this.phase = 'receiving';
     this.send({
       type: 'VIEW',
@@ -630,11 +824,36 @@ export class LupaClient {
       imageVersion: this.manifest.imageVersion,
       rect,
       viewportPx,
-      detailOffset: 0,
-      mode: 'uniform',
-      focus: null
+      detailOffset,
+      mode: this.viewMode,
+      focus
     });
     this.emitNow();
+  }
+
+  private classifyTile(epoch: number, z: number): 'context' | 'detail' {
+    if (z === 0) return 'context';
+    if (
+      this.activeIntent?.epoch === epoch &&
+      this.activeIntent.mode === 'focus' &&
+      this.plan?.epoch === epoch &&
+      z <= this.plan.contextLevel
+    ) return 'context';
+    return 'detail';
+  }
+
+  private visibleFocus(): FocusPoint | null {
+    return this.viewMode === 'focus' && this.focus ? { ...this.focus } : null;
+  }
+
+  private centerFocus(rect: ViewRect): FocusPoint {
+    const imageWidth = this.manifest?.width ?? Math.ceil(rect.x + rect.width);
+    const imageHeight = this.manifest?.height ?? Math.ceil(rect.y + rect.height);
+    return {
+      x: Math.max(0, Math.min(imageWidth - 1, Math.round(rect.x + rect.width / 2))),
+      y: Math.max(0, Math.min(imageHeight - 1, Math.round(rect.y + rect.height / 2))),
+      radiusPx: this.focus?.radiusPx ?? 144
+    };
   }
 
   private nextEpoch(): number | null {
@@ -693,7 +912,10 @@ export class LupaClient {
 }
 
 function summarizeControl(control: Record<string, unknown>): string {
-  const keys = ['epoch', 'imageId', 'imageVersion', 'deliveryId', 'status', 'appliedLevel', 'sentTiles'];
+  const keys = [
+    'epoch', 'imageId', 'imageVersion', 'deliveryId', 'status',
+    'appliedLevel', 'contextLevel', 'detailOffset', 'mode', 'sentTiles'
+  ];
   const parts = keys
     .filter((key) => control[key] !== undefined)
     .map((key) => key + '=' + String(control[key]));
@@ -709,6 +931,8 @@ function summarizeControl(control: Record<string, unknown>): string {
     if (viewport) {
       parts.push('viewport=' + [viewport.width, viewport.height].map(String).join('x'));
     }
+    const focus = control.focus as Record<string, unknown> | null | undefined;
+    if (focus) parts.push('focus=' + [focus.x, focus.y, focus.radiusPx].map(String).join(','));
   }
   return parts.join(' ');
 }

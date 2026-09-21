@@ -545,6 +545,18 @@ h1 span {
   background: #171a20;
 }
 
+.screen-stage.interactive {
+  cursor: grab;
+  touch-action: none;
+}
+
+.screen-stage.interactive.dragging { cursor: grabbing; }
+
+.screen-stage:focus-visible {
+  outline: 3px solid var(--sun);
+  outline-offset: -3px;
+}
+
 .screen-stage canvas {
   display: block;
   width: 100%;
@@ -629,6 +641,82 @@ h1 span {
 }
 
 .readout strong { font: 800 11px/1.2 monospace; }
+
+.navigation-console {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 9px;
+  border: 1px solid #171a20;
+  border-radius: 9px;
+  background: #8d938b;
+  box-shadow: inset 2px 2px 4px rgba(0,0,0,.28), inset -1px -1px 0 rgba(255,255,255,.24);
+}
+
+.navigation-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.navigation-group > span,
+.focus-radius > span {
+  margin-right: 2px;
+  color: #222820;
+  font: 800 9px/1 monospace;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.navigation-group button {
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid #252a35;
+  border-radius: 6px;
+  background: #d5d0c2;
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,.75), 0 2px 0 #57584f;
+  color: #252a35;
+  font: 800 10px/1 monospace;
+  cursor: pointer;
+}
+
+.navigation-group button.active {
+  background: #2456a6;
+  box-shadow: inset 1px 2px 3px rgba(0,0,0,.35);
+  color: white;
+  transform: translateY(1px);
+}
+
+.navigation-group button:disabled { cursor: not-allowed; opacity: .45; }
+.navigation-group button:focus-visible { outline: 2px solid #f4cf51; outline-offset: 2px; }
+
+.focus-radius {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.focus-radius input { width: 120px; accent-color: #2456a6; }
+
+.navigation-hint {
+  flex: 1 1 260px;
+  margin: 0;
+  color: #2e342d;
+  font: 700 9px/1.35 monospace;
+  text-align: right;
+}
+
+.recoverable-error {
+  margin: 10px 0;
+  padding: 8px;
+  border: 1px solid #a95049;
+  border-radius: 7px;
+  background: #f2d3cd;
+  color: #642c29;
+  font-size: 11px;
+}
 
 .telemetry-panel {
   display: flex;
@@ -861,6 +949,8 @@ h1 span {
     grid-template-columns: 1fr 1fr;
   }
   .readout.primary { grid-column: 1 / -1; }
+  .navigation-console { align-items: flex-start; }
+  .navigation-hint { flex-basis: 100%; text-align: left; }
 
   .telemetry-panel {
     grid-template-columns: 1fr 1fr;
