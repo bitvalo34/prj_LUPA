@@ -26,7 +26,10 @@ public record ServerConfig(
         int diskQueueCapacity,
         int metadataThreads,
         int metadataQueueCapacity,
-        Duration webSocketCloseTimeout) {
+        Duration webSocketCloseTimeout,
+        long tileCacheBytes,
+        long transientTileBytes,
+        int maxTileReads) {
 
     public ServerConfig(
             String host,
@@ -91,7 +94,10 @@ public record ServerConfig(
                 64,
                 defaultMetadataThreads(),
                 32,
-                Duration.ofSeconds(2));
+                Duration.ofSeconds(2),
+                128L * 1024L * 1024L,
+                16L * 1024L * 1024L,
+                8);
     }
 
     public ServerConfig {
@@ -112,7 +118,8 @@ public record ServerConfig(
                 || diskThreads < 1
                 || diskQueueCapacity < 1
                 || metadataThreads < 1
-                || metadataQueueCapacity < 1) {
+                || metadataQueueCapacity < 1
+                || maxTileReads < 1) {
             throw new IllegalArgumentException("thread/queue/connection/session limits must be positive");
         }
         if (maxWebSocketConnections > maxConnections) {
@@ -123,6 +130,25 @@ public record ServerConfig(
         }
         requirePositive(headerTimeout, "headerTimeout");
         requirePositive(webSocketCloseTimeout, "webSocketCloseTimeout");
+
+        if (tileCacheBytes < 262_144L) {
+            throw new IllegalArgumentException(
+                    "tileCacheBytes must hold at least one maximum LUPA tile");
+        }
+        long maximumEnvelopeBytes = 4L + 4096L + 262_144L;
+        long minimumTransientBytes =
+                Math.multiplyExact((long) maxSessions, maximumEnvelopeBytes);
+        if (transientTileBytes < minimumTransientBytes) {
+            throw new IllegalArgumentException(
+                    "transientTileBytes must cover one maximum TILE envelope per active session");
+        }
+        long diskSubmissionCapacity =
+                (long) diskThreads + (long) diskQueueCapacity;
+        if (maxTileReads > diskSubmissionCapacity) {
+            throw new IllegalArgumentException(
+                    "maxTileReads cannot exceed disk threads plus disk queue capacity");
+        }
+
         if (maxResourceBytes < 1 || maxCatalogBytes < 1) {
             throw new IllegalArgumentException("byte limits must be positive");
         }
@@ -156,7 +182,10 @@ public record ServerConfig(
                 64,
                 Math.min(2, cpus),
                 32,
-                Duration.ofSeconds(2));
+                Duration.ofSeconds(2),
+                128L * 1024L * 1024L,
+                16L * 1024L * 1024L,
+                8);
     }
 
     public static ServerConfig fromArgs(String[] args) {
@@ -186,7 +215,9 @@ public record ServerConfig(
                         "max-ws-connections", "max-sessions",
                         "disk-threads", "disk-queue-capacity",
                         "metadata-threads", "metadata-queue-capacity",
-                        "ws-close-timeout-ms" -> true;
+                        "ws-close-timeout-ms",
+                        "tile-cache-bytes", "transient-tile-bytes",
+                        "max-tile-reads" -> true;
                 default -> false;
             }) {
                 throw new IllegalArgumentException("unknown argument: --" + key);
@@ -235,7 +266,10 @@ public record ServerConfig(
                 Duration.ofMillis(parseInt(
                         values,
                         "ws-close-timeout-ms",
-                        (int) defaults.webSocketCloseTimeout().toMillis())));
+                        (int) defaults.webSocketCloseTimeout().toMillis())),
+                parseLong(values, "tile-cache-bytes", defaults.tileCacheBytes()),
+                parseLong(values, "transient-tile-bytes", defaults.transientTileBytes()),
+                parseInt(values, "max-tile-reads", defaults.maxTileReads()));
     }
 
     private static void requirePositive(Duration value, String name) {
@@ -271,6 +305,19 @@ public record ServerConfig(
             return Integer.parseInt(value);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("--" + name + " must be an integer", e);
+        }
+    }
+
+    private static long parseLong(
+            Map<String, String> values,
+            String name,
+            long fallback) {
+        String value = values.get(name);
+        if (value == null) return fallback;
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("--" + name + " must be a long integer", e);
         }
     }
 

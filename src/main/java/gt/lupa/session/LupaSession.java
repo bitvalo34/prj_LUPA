@@ -3,6 +3,8 @@ package gt.lupa.session;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import gt.lupa.concurrent.TileReadAdmission;
+import gt.lupa.concurrent.TransientBufferBudget;
 import gt.lupa.protocol.LupaControlException;
 import gt.lupa.protocol.LupaJson;
 import gt.lupa.protocol.LupaProtocol;
@@ -23,6 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -32,18 +35,24 @@ public final class LupaSession implements WebSocketEndpoint {
     private static final Set<String> RELEASE_STATUSES = Set.of("displayed", "discarded", "failed");
     private static final boolean I21_DIAGNOSTICS = Boolean.getBoolean("lupa.i21.diag");
     private static final AtomicInteger SESSION_IDS = new AtomicInteger();
+    private static final int MAX_TILE_ENVELOPE_BYTES =
+            4 + 4096 + LupaProtocol.MAX_TILE_BYTES;
 
     private final PublishedImageStore store;
     private final TileReader tileReader;
     private final Executor diskExecutor;
     private final Executor metadataExecutor;
     private final SessionAdmission sessionAdmission;
+    private final TileReadAdmission tileReadAdmission;
+    private final TransientBufferBudget transientBuffers;
     private final SerialExecutor serial;
     private final LupaJson json = new LupaJson();
     private final ViewPlanner viewPlanner = new ViewPlanner();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicBoolean cleanupScheduled = new AtomicBoolean();
     private final Map<Integer, DeliveryReservation> deliveries = new LinkedHashMap<>();
+    private final Set<TransientBufferBudget.Lease> liveTransientBuffers =
+            ConcurrentHashMap.newKeySet();
     private volatile SessionAdmission.Lease admissionLease;
     private final int diagnosticSessionId = SESSION_IDS.incrementAndGet();
 
@@ -90,6 +99,8 @@ public final class LupaSession implements WebSocketEndpoint {
         this.diskExecutor = Objects.requireNonNull(diskExecutor);
         this.metadataExecutor = Objects.requireNonNull(metadataExecutor);
         this.sessionAdmission = null;
+        this.tileReadAdmission = null;
+        this.transientBuffers = null;
         this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
         this.deliveryIds = new DeliveryIdSequence();
     }
@@ -106,6 +117,28 @@ public final class LupaSession implements WebSocketEndpoint {
         this.diskExecutor = Objects.requireNonNull(diskExecutor);
         this.metadataExecutor = Objects.requireNonNull(metadataExecutor);
         this.sessionAdmission = Objects.requireNonNull(sessionAdmission);
+        this.tileReadAdmission = null;
+        this.transientBuffers = null;
+        this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
+        this.deliveryIds = new DeliveryIdSequence();
+    }
+
+    public LupaSession(
+            PublishedImageStore store,
+            TileReader tileReader,
+            Executor stateExecutor,
+            Executor diskExecutor,
+            Executor metadataExecutor,
+            SessionAdmission sessionAdmission,
+            TileReadAdmission tileReadAdmission,
+            TransientBufferBudget transientBuffers) {
+        this.store = Objects.requireNonNull(store);
+        this.tileReader = Objects.requireNonNull(tileReader);
+        this.diskExecutor = Objects.requireNonNull(diskExecutor);
+        this.metadataExecutor = Objects.requireNonNull(metadataExecutor);
+        this.sessionAdmission = Objects.requireNonNull(sessionAdmission);
+        this.tileReadAdmission = Objects.requireNonNull(tileReadAdmission);
+        this.transientBuffers = Objects.requireNonNull(transientBuffers);
         this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
         this.deliveryIds = new DeliveryIdSequence();
     }
@@ -122,6 +155,8 @@ public final class LupaSession implements WebSocketEndpoint {
         this.diskExecutor = Objects.requireNonNull(diskExecutor);
         this.metadataExecutor = Objects.requireNonNull(metadataExecutor);
         this.sessionAdmission = null;
+        this.tileReadAdmission = null;
+        this.transientBuffers = null;
         this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
         this.deliveryIds = new DeliveryIdSequence(firstDeliveryId);
     }
@@ -142,17 +177,20 @@ public final class LupaSession implements WebSocketEndpoint {
     public void onClosed(int code, String reason) {
         closed.set(true);
         releaseAdmission();
+        releaseAllTransientBuffers();
         if (!cleanupScheduled.compareAndSet(false, true)) return;
         try {
             serial.execute(() -> {
                 state = LupaSessionState.CERRADA;
+                ActivePlan closingPlan = activePlan;
                 activePlan = null;
+                discardPlanResources(closingPlan);
                 diagnosticCredits("CLOSE", null, "code=" + code + " reason=" + boundedMessage(reason));
                 deliveries.clear();
                 freeWindowBytes = 0;
             });
         } catch (RejectedExecutionException ignored) {
-            // The connection is terminal and the session becomes unreachable with the transport.
+            // Transport is terminal. Shared budgets were already released above.
         }
     }
 
@@ -516,35 +554,144 @@ public final class LupaSession implements WebSocketEndpoint {
         }
 
         if (deliveries.size() >= LupaProtocol.MAX_IN_FLIGHT) return;
+        if (plan.readWait != null) return;
+
+        requestTileRead(plan);
+    }
+
+    private void requestTileRead(ActivePlan plan) {
+        if (tileReadAdmission == null) {
+            startTileRead(plan, null);
+            return;
+        }
+
+        TileReadAdmission.AcquireResult admission =
+                tileReadAdmission.acquireOrQueue(
+                        lease -> onReadPermitGrantedAsync(plan.generation, lease));
+
+        if (!admission.accepted()) {
+            failPlan(
+                    plan,
+                    LupaProtocol.ErrorCode.INTERNAL_READ_ERROR,
+                    "server tile read admission queue is full");
+            return;
+        }
+
+        if (admission.grantedImmediately()) {
+            startTileRead(plan, admission.lease());
+            return;
+        }
+
+        plan.readWait = admission.waitHandle();
+    }
+
+    private void onReadPermitGrantedAsync(
+            long generation,
+            TileReadAdmission.Lease lease) {
+        if (closed.get()) {
+            lease.close();
+            return;
+        }
+        try {
+            serial.execute(() -> onReadPermitGranted(generation, lease));
+        } catch (RejectedExecutionException e) {
+            lease.close();
+            closed.set(true);
+            state = LupaSessionState.CERRADA;
+            Sender current = sender;
+            if (current != null) {
+                current.close(1011, "server session queue is full");
+            }
+        }
+    }
+
+    private void onReadPermitGranted(
+            long generation,
+            TileReadAdmission.Lease lease) {
+        ActivePlan plan = activePlan;
+        if (closed.get() || plan == null || plan.generation != generation) {
+            lease.close();
+            return;
+        }
+
+        plan.readWait = null;
+        startTileRead(plan, lease);
+    }
+
+    private void startTileRead(
+            ActivePlan plan,
+            TileReadAdmission.Lease readLease) {
+        if (closed.get() || activePlan != plan || plan.busy) {
+            if (readLease != null) readLease.close();
+            return;
+        }
+
+        if (!plan.cursor.hasNext()) {
+            if (readLease != null) readLease.close();
+            pump();
+            return;
+        }
 
         ViewPlanner.TileDescriptor descriptor = plan.cursor.next();
         ViewPlanner.TileRef ref = descriptor.ref();
-        boolean openingThumbnail = descriptor.role() == ViewPlanner.TileRole.OPENING_THUMBNAIL;
+        boolean openingThumbnail =
+                descriptor.role() == ViewPlanner.TileRole.OPENING_THUMBNAIL;
         plan.busy = true;
         long generation = plan.generation;
         PublishedImageStore.OpenedImage imageAtRead = opened;
 
         try {
             diskExecutor.execute(() -> {
+                TileData tile = null;
+                TileReadException failure = null;
                 try {
-                    TileData tile = tileReader.read(imageAtRead, ref.z(), ref.x(), ref.y());
-                    submitSerial(() -> onTileRead(
-                            generation, ref, openingThumbnail, tile, null), sender);
+                    tile = tileReader.read(
+                            imageAtRead,
+                            ref.z(),
+                            ref.x(),
+                            ref.y());
                 } catch (TileReadException e) {
-                    submitSerial(() -> onTileRead(
-                            generation, ref, openingThumbnail, null, e), sender);
+                    failure = e;
                 } catch (RuntimeException e) {
-                    submitSerial(() -> onTileRead(
-                            generation,
-                            ref,
-                            openingThumbnail,
-                            null,
-                            new TileReadException("unexpected tile read failure", e)), sender);
+                    failure = new TileReadException(
+                            "unexpected tile read failure",
+                            e);
+                } finally {
+                    if (readLease != null) readLease.close();
                 }
+
+                TileData resultTile = tile;
+                TileReadException resultFailure = failure;
+                submitTileResult(
+                        () -> onTileRead(
+                                generation,
+                                ref,
+                                openingThumbnail,
+                                resultTile,
+                                resultFailure),
+                        resultTile);
             });
         } catch (RejectedExecutionException e) {
+            if (readLease != null) readLease.close();
             plan.busy = false;
-            failPlan(plan, LupaProtocol.ErrorCode.INTERNAL_READ_ERROR, "server tile read queue is full");
+            failPlan(
+                    plan,
+                    LupaProtocol.ErrorCode.INTERNAL_READ_ERROR,
+                    "server tile read queue is full");
+        }
+    }
+
+    private void submitTileResult(Runnable task, TileData tile) {
+        try {
+            serial.execute(task);
+        } catch (RejectedExecutionException e) {
+            if (tile != null) tile.close();
+            closed.set(true);
+            state = LupaSessionState.CERRADA;
+            Sender current = sender;
+            if (current != null) {
+                current.close(1011, "server session queue is full");
+            }
         }
     }
 
@@ -555,11 +702,27 @@ public final class LupaSession implements WebSocketEndpoint {
             TileData tile,
             TileReadException failure) {
         ActivePlan plan = activePlan;
-        if (plan == null || plan.generation != generation) return;
+        if (plan == null || plan.generation != generation) {
+            if (tile != null) tile.close();
+            return;
+        }
+
         plan.busy = false;
 
         if (failure != null) {
-            failPlan(plan, LupaProtocol.ErrorCode.INTERNAL_READ_ERROR, "published tile could not be read");
+            if (tile != null) tile.close();
+            failPlan(
+                    plan,
+                    LupaProtocol.ErrorCode.INTERNAL_READ_ERROR,
+                    "published tile could not be read");
+            return;
+        }
+
+        if (tile == null) {
+            failPlan(
+                    plan,
+                    LupaProtocol.ErrorCode.INTERNAL_READ_ERROR,
+                    "published tile read returned no data");
             return;
         }
 
@@ -568,7 +731,12 @@ public final class LupaSession implements WebSocketEndpoint {
     }
 
     private void trySendPending(ActivePlan plan) {
-        if (closed.get() || activePlan != plan || plan.busy || plan.pendingTile == null) return;
+        if (closed.get()
+                || activePlan != plan
+                || plan.busy
+                || plan.pendingTile == null) {
+            return;
+        }
         if (deliveries.size() >= LupaProtocol.MAX_IN_FLIGHT) return;
         if (deliveryIds.exhausted()) {
             requireNewSession(
@@ -580,24 +748,81 @@ public final class LupaSession implements WebSocketEndpoint {
 
         PendingTile pending = plan.pendingTile;
         int deliveryId = deliveryIds.peek();
-        final byte[] envelope;
+
+        final byte[] encodedHeader;
         try {
-            envelope = buildTileEnvelope(deliveryId, plan.view.epoch(), pending.ref, pending.tile);
-        } catch (JsonProcessingException e) {
-            failPlan(plan, LupaProtocol.ErrorCode.INTERNAL_READ_ERROR, "TILE header could not be encoded");
+            encodedHeader = buildTileHeader(
+                    deliveryId,
+                    plan.view.epoch(),
+                    pending.ref,
+                    pending.tile);
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            discardPendingTile(plan);
+            failPlan(
+                    plan,
+                    LupaProtocol.ErrorCode.INTERNAL_READ_ERROR,
+                    "TILE header could not be encoded");
             return;
         }
 
-        int reservationBytes = envelope.length;
+        int reservationBytes;
+        try {
+            reservationBytes = Math.addExact(
+                    4 + encodedHeader.length,
+                    pending.tile.jpegLength());
+        } catch (ArithmeticException e) {
+            discardPendingTile(plan);
+            failPlan(
+                    plan,
+                    LupaProtocol.ErrorCode.LIMIT_EXCEEDED,
+                    "TILE envelope size overflow");
+            return;
+        }
+
         if (reservationBytes > negotiatedWindowBytes) {
-            failPlan(plan, LupaProtocol.ErrorCode.LIMIT_EXCEEDED, "single TILE exceeds negotiated window");
+            discardPendingTile(plan);
+            failPlan(
+                    plan,
+                    LupaProtocol.ErrorCode.LIMIT_EXCEEDED,
+                    "single TILE exceeds negotiated window");
             return;
         }
         if (reservationBytes > freeWindowBytes) return;
 
+        TransientBufferBudget.Lease transientLease = null;
+        if (transientBuffers != null) {
+            transientLease = transientBuffers.tryReserve(reservationBytes);
+            if (transientLease == null) {
+                discardPendingTile(plan);
+                failPlan(
+                        plan,
+                        LupaProtocol.ErrorCode.LIMIT_EXCEEDED,
+                        "server transient compressed-buffer budget is full");
+                return;
+            }
+            liveTransientBuffers.add(transientLease);
+        }
+
+        final byte[] envelope;
+        try {
+            envelope = buildTileEnvelope(encodedHeader, pending.tile);
+        } catch (RuntimeException e) {
+            releaseTransientBuffer(transientLease);
+            discardPendingTile(plan);
+            failPlan(
+                    plan,
+                    LupaProtocol.ErrorCode.INTERNAL_READ_ERROR,
+                    "TILE envelope could not be built");
+            return;
+        }
+
+        pending.tile.close();
+
         int allocatedDeliveryId = deliveryIds.take();
         if (allocatedDeliveryId != deliveryId) {
-            throw new IllegalStateException("deliveryId sequence changed inside serialized session state");
+            releaseTransientBuffer(transientLease);
+            throw new IllegalStateException(
+                    "deliveryId sequence changed inside serialized session state");
         }
 
         DeliveryReservation reservation = new DeliveryReservation(
@@ -605,29 +830,56 @@ public final class LupaSession implements WebSocketEndpoint {
                 plan.view.epoch(),
                 plan.generation,
                 reservationBytes,
-                pending.openingThumbnail());
+                pending.openingThumbnail(),
+                transientLease);
         deliveries.put(deliveryId, reservation);
         freeWindowBytes -= reservationBytes;
         plan.pendingTile = null;
         plan.busy = true;
         enforceCreditInvariant(sender);
-        diagnosticCredits("RESERVE", deliveryId,
-                "epoch=" + plan.view.epoch()
-                        + " bytes=" + reservationBytes);
+        diagnosticCredits(
+                "RESERVE",
+                deliveryId,
+                "epoch=" + plan.view.epoch() + " bytes=" + reservationBytes);
+
         if (closed.get()) return;
 
-        WebSocketEndpoint.BinarySend write = sender.sendBinaryTracked(
-                envelope,
-                () -> submitSerial(() -> onTileCommitted(deliveryId), sender),
-                () -> submitSerial(() -> onTileWritten(plan.generation, deliveryId), sender));
-        reservation.write = write;
+        final TransientBufferBudget.Lease sendLease = transientLease;
+        final WebSocketEndpoint.BinarySend write;
+        try {
+            write = sender.sendBinaryTracked(
+                    envelope,
+                    () -> submitSerial(() -> onTileCommitted(deliveryId), sender),
+                    () -> {
+                        releaseTransientBuffer(sendLease);
+                        submitSerial(
+                                () -> onTileWritten(plan.generation, deliveryId),
+                                sender);
+                    });
+        } catch (RuntimeException e) {
+            DeliveryReservation removed = deliveries.remove(deliveryId);
+            if (removed != null) {
+                removed.state = DeliveryState.CANCELLED;
+                freeWindowBytes += removed.reservedBytes;
+            }
+            releaseTransientBuffer(sendLease);
+            plan.busy = false;
+            enforceCreditInvariant(sender);
+            failPlan(
+                    plan,
+                    LupaProtocol.ErrorCode.INTERNAL_READ_ERROR,
+                    "WebSocket TILE write failed");
+            return;
+        }
 
+        reservation.write = write;
         if (!write.accepted()) {
             DeliveryReservation removed = deliveries.remove(deliveryId);
             if (removed != null) {
                 removed.state = DeliveryState.CANCELLED;
                 freeWindowBytes += removed.reservedBytes;
             }
+            releaseTransientBuffer(sendLease);
             plan.busy = false;
             enforceCreditInvariant(sender);
             closed.set(true);
@@ -659,14 +911,14 @@ public final class LupaSession implements WebSocketEndpoint {
         pump();
     }
 
-    private byte[] buildTileEnvelope(
+    private byte[] buildTileHeader(
             int deliveryId,
             int epoch,
             ViewPlanner.TileRef ref,
             TileData tile) throws JsonProcessingException {
-        byte[] jpeg = tile.jpeg();
-        if (jpeg.length > LupaProtocol.MAX_TILE_BYTES) {
-            throw new IllegalArgumentException("tile payload exceeds LUPA v1 limit");
+        if (tile.jpegLength() > LupaProtocol.MAX_TILE_BYTES) {
+            throw new IllegalArgumentException(
+                    "tile payload exceeds LUPA v1 limit");
         }
 
         ObjectNode header = json.mapper().createObjectNode();
@@ -681,16 +933,31 @@ public final class LupaSession implements WebSocketEndpoint {
         header.put("w", tile.width());
         header.put("h", tile.height());
         header.put("codec", "jpeg");
-        header.put("payloadBytes", jpeg.length);
+        header.put("payloadBytes", tile.jpegLength());
 
         byte[] encodedHeader = json.mapper().writeValueAsBytes(header);
         if (encodedHeader.length > 4096) {
-            throw new IllegalArgumentException("TILE header exceeds LUPA v1 limit");
+            throw new IllegalArgumentException(
+                    "TILE header exceeds LUPA v1 limit");
         }
-        ByteBuffer message = ByteBuffer.allocate(4 + encodedHeader.length + jpeg.length);
+        return encodedHeader;
+    }
+
+    private byte[] buildTileEnvelope(
+            byte[] encodedHeader,
+            TileData tile) {
+        int total = Math.addExact(
+                4 + encodedHeader.length,
+                tile.jpegLength());
+        if (total > MAX_TILE_ENVELOPE_BYTES) {
+            throw new IllegalArgumentException(
+                    "TILE envelope exceeds LUPA v1 limit");
+        }
+
+        ByteBuffer message = ByteBuffer.allocate(total);
         message.putInt(encodedHeader.length);
         message.put(encodedHeader);
-        message.put(jpeg);
+        tile.copyJpegTo(message);
         return message.array();
     }
 
@@ -698,6 +965,7 @@ public final class LupaSession implements WebSocketEndpoint {
         if (activePlan != plan) return;
         activePlan = null;
         planGeneration++;
+        discardPlanResources(plan);
         cancelUncommittedControl(plan.planWrite);
         cancelUncommittedControl(plan.doneWrite);
         cancelUncommittedDeliveries(plan.generation);
@@ -720,6 +988,7 @@ public final class LupaSession implements WebSocketEndpoint {
         activePlan = null;
         planGeneration++;
         if (invalidated != null) {
+            discardPlanResources(invalidated);
             cancelUncommittedControl(invalidated.planWrite);
             cancelUncommittedControl(invalidated.doneWrite);
             cancelUncommittedDeliveries(invalidated.generation);
@@ -741,12 +1010,41 @@ public final class LupaSession implements WebSocketEndpoint {
 
             reservation.state = DeliveryState.CANCELLED;
             freeWindowBytes += reservation.reservedBytes;
+            releaseTransientBuffer(reservation.transientBuffer);
             iterator.remove();
             diagnosticCredits("CANCEL_PRECOMMIT", entry.getKey(),
                     "epoch=" + reservation.epoch
                             + " bytes=" + reservation.reservedBytes);
         }
         enforceCreditInvariant(sender);
+    }
+
+    private void discardPendingTile(ActivePlan plan) {
+        if (plan == null || plan.pendingTile == null) return;
+        TileData tile = plan.pendingTile.tile;
+        plan.pendingTile = null;
+        tile.close();
+    }
+
+    private void discardPlanResources(ActivePlan plan) {
+        if (plan == null) return;
+        TileReadAdmission.WaitHandle wait = plan.readWait;
+        plan.readWait = null;
+        if (wait != null) wait.cancel();
+        discardPendingTile(plan);
+    }
+
+    private void releaseTransientBuffer(TransientBufferBudget.Lease lease) {
+        if (lease == null) return;
+        liveTransientBuffers.remove(lease);
+        lease.close();
+    }
+
+    private void releaseAllTransientBuffers() {
+        for (TransientBufferBudget.Lease lease :
+                liveTransientBuffers.toArray(TransientBufferBudget.Lease[]::new)) {
+            releaseTransientBuffer(lease);
+        }
     }
 
     private void enforceCreditInvariant(Sender sender) {
@@ -900,6 +1198,7 @@ public final class LupaSession implements WebSocketEndpoint {
         private boolean busy;
         private int sentTiles;
         private PendingTile pendingTile;
+        private TileReadAdmission.WaitHandle readWait;
 
         private ActivePlan(
                 long generation,
@@ -932,6 +1231,7 @@ public final class LupaSession implements WebSocketEndpoint {
         private final long planGeneration;
         private final int reservedBytes;
         private final boolean openingThumbnail;
+        private final TransientBufferBudget.Lease transientBuffer;
         private DeliveryState state = DeliveryState.RESERVED_QUEUED;
         private WebSocketEndpoint.BinarySend write;
 
@@ -940,12 +1240,14 @@ public final class LupaSession implements WebSocketEndpoint {
                 int epoch,
                 long planGeneration,
                 int reservedBytes,
-                boolean openingThumbnail) {
+                boolean openingThumbnail,
+                TransientBufferBudget.Lease transientBuffer) {
             this.deliveryId = deliveryId;
             this.epoch = epoch;
             this.planGeneration = planGeneration;
             this.reservedBytes = reservedBytes;
             this.openingThumbnail = openingThumbnail;
+            this.transientBuffer = transientBuffer;
         }
     }
 }

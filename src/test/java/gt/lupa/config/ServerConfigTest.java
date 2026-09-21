@@ -28,6 +28,9 @@ class ServerConfigTest {
         assertEquals(32, config.metadataQueueCapacity());
         assertTrue(config.diskThreads() > 0);
         assertTrue(config.metadataThreads() > 0);
+        assertEquals(128L * 1024L * 1024L, config.tileCacheBytes());
+        assertEquals(16L * 1024L * 1024L, config.transientTileBytes());
+        assertEquals(8, config.maxTileReads());
     }
 
     @Test
@@ -43,7 +46,10 @@ class ServerConfigTest {
                 "--disk-queue-capacity=9",
                 "--metadata-threads=1",
                 "--metadata-queue-capacity=5",
-                "--ws-close-timeout-ms=750"
+                "--ws-close-timeout-ms=750",
+                "--tile-cache-bytes=1048576",
+                "--transient-tile-bytes=4000000",
+                "--max-tile-reads=4"
         });
 
         assertEquals(20, config.maxConnections());
@@ -57,6 +63,9 @@ class ServerConfigTest {
         assertEquals(1, config.metadataThreads());
         assertEquals(5, config.metadataQueueCapacity());
         assertEquals(750, config.webSocketCloseTimeout().toMillis());
+        assertEquals(1048576L, config.tileCacheBytes());
+        assertEquals(4000000L, config.transientTileBytes());
+        assertEquals(4, config.maxTileReads());
     }
 
     @Test
@@ -74,6 +83,25 @@ class ServerConfigTest {
                         "--max-connections=10",
                         "--max-ws-connections=8",
                         "--max-sessions=9"
+                }));
+    }
+
+    @Test
+    void incoherentMemoryAndReadLimitsAreRejected() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ServerConfig.fromArgs(new String[]{"--tile-cache-bytes=262143"}));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ServerConfig.fromArgs(new String[]{"--transient-tile-bytes=1024"}));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ServerConfig.fromArgs(new String[]{
+                        "--disk-threads=1",
+                        "--disk-queue-capacity=1",
+                        "--max-tile-reads=3"
                 }));
     }
 

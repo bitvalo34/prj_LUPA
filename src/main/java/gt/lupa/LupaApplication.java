@@ -1,14 +1,18 @@
 package gt.lupa;
 
 import gt.lupa.concurrent.StorageExecutors;
+import gt.lupa.concurrent.TileReadAdmission;
+import gt.lupa.concurrent.TransientBufferBudget;
 import gt.lupa.config.ServerConfig;
 import gt.lupa.http.HttpRouter;
 import gt.lupa.http.NioHttpServer;
 import gt.lupa.protocol.LupaProtocol;
 import gt.lupa.session.LupaSession;
 import gt.lupa.session.SessionAdmission;
+import gt.lupa.storage.CachingTileReader;
 import gt.lupa.storage.CatalogSource;
 import gt.lupa.storage.ClasspathCatalogSource;
+import gt.lupa.storage.CompressedTileCache;
 import gt.lupa.storage.FileCatalogSource;
 import gt.lupa.storage.PublishedImageStore;
 import gt.lupa.storage.PublishedTileReader;
@@ -30,9 +34,17 @@ public final class LupaApplication {
         HttpRouter router = new HttpRouter(catalogSource, config.maxResourceBytes());
         PublishedImageStore imageStore =
                 new PublishedImageStore(config.dataRoot(), config.maxCatalogBytes());
-        PublishedTileReader tileReader =
-                new PublishedTileReader(imageStore, LupaProtocol.MAX_TILE_BYTES);
+        CompressedTileCache tileCache =
+                new CompressedTileCache(config.tileCacheBytes());
+        CachingTileReader tileReader =
+                new CachingTileReader(
+                        new PublishedTileReader(imageStore, LupaProtocol.MAX_TILE_BYTES),
+                        tileCache);
         SessionAdmission sessionAdmission = new SessionAdmission(config.maxSessions());
+        TileReadAdmission tileReadAdmission =
+                new TileReadAdmission(config.maxTileReads(), config.maxSessions());
+        TransientBufferBudget transientBuffers =
+                new TransientBufferBudget(config.transientTileBytes());
         StorageExecutors storageExecutors = new StorageExecutors(config);
 
         NioHttpServer server = new NioHttpServer(
@@ -44,7 +56,9 @@ public final class LupaApplication {
                         stateExecutor,
                         storageExecutors.diskExecutor(),
                         storageExecutors.metadataExecutor(),
-                        sessionAdmission));
+                        sessionAdmission,
+                        tileReadAdmission,
+                        transientBuffers));
 
         try {
             server.start();
@@ -63,7 +77,7 @@ public final class LupaApplication {
         System.out.printf(
                 "LUPA E22 base listening on http://%s:%d/ "
                         + "(catalog=%s, dataRoot=%s, connections=%d, websockets=%d, sessions=%d, "
-                        + "disk=%dx%d, metadata=%dx%d)%n",
+                        + "disk=%dx%d, metadata=%dx%d, tileReads=%d, cacheBytes=%d, transientBytes=%d)%n",
                 config.host(),
                 server.port(),
                 config.catalogMode(),
@@ -74,7 +88,10 @@ public final class LupaApplication {
                 config.diskThreads(),
                 config.diskQueueCapacity(),
                 config.metadataThreads(),
-                config.metadataQueueCapacity());
+                config.metadataQueueCapacity(),
+                config.maxTileReads(),
+                config.tileCacheBytes(),
+                config.transientTileBytes());
 
         try {
             new CountDownLatch(1).await();

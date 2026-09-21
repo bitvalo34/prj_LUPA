@@ -21,7 +21,11 @@ public final class PublishedTileReader implements TileReader {
     }
 
     @Override
-    public TileData read(PublishedImageStore.OpenedImage opened, int z, int x, int y) throws TileReadException {
+    public TileData read(
+            PublishedImageStore.OpenedImage opened,
+            int z,
+            int x,
+            int y) throws TileReadException {
         final Path path;
         try {
             path = store.resolveTile(opened, z, x, y);
@@ -40,24 +44,32 @@ public final class PublishedTileReader implements TileReader {
                 bytes = in.readNBytes(maxTileBytes + 1);
             }
             if (bytes.length < 4 || bytes.length > maxTileBytes) {
-                throw new TileReadException("published tile size changed or exceeds the configured limit");
+                throw new TileReadException(
+                        "published tile size changed or exceeds the configured limit");
             }
             if ((bytes[0] & 0xff) != 0xff || (bytes[1] & 0xff) != 0xd8) {
                 throw new TileReadException("published tile is not a JPEG");
             }
 
             BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
-            if (image == null) throw new TileReadException("published tile JPEG cannot be decoded");
+            if (image == null) {
+                throw new TileReadException("published tile JPEG cannot be decoded");
+            }
 
             ImageLevel level = opened.manifest().levels().get(z);
             int tileSize = opened.manifest().tileSize();
             int expectedWidth = Math.min(tileSize, level.width() - x * tileSize);
             int expectedHeight = Math.min(tileSize, level.height() - y * tileSize);
             if (image.getWidth() != expectedWidth || image.getHeight() != expectedHeight) {
-                throw new TileReadException("published tile dimensions disagree with the manifest");
+                throw new TileReadException(
+                        "published tile dimensions disagree with the manifest");
             }
 
-            return new TileData(bytes, expectedWidth, expectedHeight);
+            /*
+             * bytes was allocated exclusively for this validated read. Adopt it
+             * directly instead of cloning another <=256 KiB array before cache insertion.
+             */
+            return TileData.owned(bytes, expectedWidth, expectedHeight);
         } catch (IOException e) {
             throw new TileReadException("published tile could not be read", e);
         }
