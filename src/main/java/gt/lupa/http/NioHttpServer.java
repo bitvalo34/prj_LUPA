@@ -1,6 +1,8 @@
 package gt.lupa.http;
 
+import gt.lupa.concurrent.ShutdownSupport;
 import gt.lupa.config.ServerConfig;
+import gt.lupa.diagnostics.E22Metrics;
 import gt.lupa.websocket.WebSocketConnection;
 import gt.lupa.websocket.WebSocketEndpoint;
 import gt.lupa.websocket.WebSocketHandshake;
@@ -40,25 +42,50 @@ public final class NioHttpServer implements AutoCloseable {
     private final ThreadPoolExecutor workers;
     private final ScheduledExecutorService timers;
     private final Function<Executor, WebSocketEndpoint> webSocketEndpointFactory;
+    private final E22Metrics metrics;
     private final AtomicBoolean running = new AtomicBoolean();
     private AsynchronousChannelGroup ioGroup;
     private AsynchronousServerSocketChannel server;
 
     public NioHttpServer(ServerConfig config, HttpRouter router) {
-        this(config, router, ignored -> new WebSocketEndpoint() {});
+        this(
+                config,
+                router,
+                ignored -> new WebSocketEndpoint() {},
+                new E22Metrics());
     }
 
-    public NioHttpServer(ServerConfig config, HttpRouter router, Supplier<WebSocketEndpoint> webSocketEndpoints) {
-        this(config, router, ignored -> webSocketEndpoints.get());
+    public NioHttpServer(
+            ServerConfig config,
+            HttpRouter router,
+            Supplier<WebSocketEndpoint> webSocketEndpoints) {
+        this(
+                config,
+                router,
+                ignored -> webSocketEndpoints.get(),
+                new E22Metrics());
     }
 
     public NioHttpServer(
             ServerConfig config,
             HttpRouter router,
             Function<Executor, WebSocketEndpoint> webSocketEndpointFactory) {
+        this(
+                config,
+                router,
+                webSocketEndpointFactory,
+                new E22Metrics());
+    }
+
+    public NioHttpServer(
+            ServerConfig config,
+            HttpRouter router,
+            Function<Executor, WebSocketEndpoint> webSocketEndpointFactory,
+            E22Metrics metrics) {
         this.config = config;
         this.router = router;
         this.webSocketEndpointFactory = webSocketEndpointFactory;
+        this.metrics = java.util.Objects.requireNonNull(metrics);
         this.connectionSlots = new Semaphore(config.maxConnections(), true);
         this.webSocketSlots = new Semaphore(config.maxWebSocketConnections(), true);
         this.workers = new ThreadPoolExecutor(
@@ -107,6 +134,22 @@ public final class NioHttpServer implements AutoCloseable {
             int activeWorkers,
             int queuedWorkerTasks) {}
 
+    E22Metrics.Snapshot metricsSnapshotForTest() {
+        return metrics.snapshot();
+    }
+
+    ShutdownSnapshot shutdownSnapshotForTest() {
+        return new ShutdownSnapshot(
+                workers.isTerminated(),
+                timers.isTerminated(),
+                ioGroup == null || ioGroup.isTerminated());
+    }
+
+    record ShutdownSnapshot(
+            boolean workersTerminated,
+            boolean timersTerminated,
+            boolean ioGroupTerminated) {}
+
     private void acceptNext() {
         if (!running.get()) return;
         server.accept(null, new CompletionHandler<AsynchronousSocketChannel, Void>() {
@@ -128,6 +171,7 @@ public final class NioHttpServer implements AutoCloseable {
                     connection.start();
                 } catch (IOException | RuntimeException e) {
                     connectionSlots.release();
+            metrics.recordConnectionRelease();
                     closeQuietly(socket);
                 }
             }
@@ -144,12 +188,21 @@ public final class NioHttpServer implements AutoCloseable {
         running.set(false);
         if (server != null) closeQuietly(server);
         for (Connection connection : connections.toArray(Connection[]::new)) connection.finish();
-        workers.shutdownNow();
-        timers.shutdownNow();
+        ShutdownSupport.shutdownNowAndAwait(
+                workers,
+                Duration.ofSeconds(2));
+        ShutdownSupport.shutdownNowAndAwait(
+                timers,
+                Duration.ofSeconds(2));
         if (ioGroup != null) {
             try {
                 ioGroup.shutdownNow();
+                ioGroup.awaitTermination(
+                        2,
+                        TimeUnit.SECONDS);
             } catch (IOException ignored) {
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }
     }
@@ -170,8 +223,16 @@ public final class NioHttpServer implements AutoCloseable {
         private void start() {
             Duration duration = config.headerTimeout();
             timeout = timers.schedule(
-                    () -> respondOnce(ResponseFactory.error(408, "request headers were not completed in time"), false),
-                    duration.toMillis(), TimeUnit.MILLISECONDS);
+                    () -> {
+                        metrics.recordHeaderTimeout();
+                        respondOnce(
+                                ResponseFactory.error(
+                                        408,
+                                        "request headers were not completed in time"),
+                                false);
+                    },
+                    duration.toMillis(),
+                    TimeUnit.MILLISECONDS);
             readNext();
         }
 
@@ -290,6 +351,7 @@ public final class NioHttpServer implements AutoCloseable {
                     config.pingInterval(),
                     config.pongTimeout(),
                     config.writeProgressTimeout(),
+                    metrics,
                     this::finish).start(trailing);
         }
 
@@ -311,6 +373,7 @@ public final class NioHttpServer implements AutoCloseable {
         private void releaseWebSocketSlot() {
             if (webSocketSlotHeld.compareAndSet(true, false)) {
                 webSocketSlots.release();
+                metrics.recordWebSocketRelease();
             }
         }
 

@@ -1,6 +1,7 @@
 package gt.lupa.websocket;
 
 import gt.lupa.concurrent.MonotonicScheduler;
+import gt.lupa.diagnostics.E22Metrics;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -53,6 +54,7 @@ public final class WebSocketConnection {
                 Duration.ofDays(365),
                 Duration.ofDays(365),
                 null,
+                new E22Metrics(),
                 onClosed);
     }
 
@@ -64,6 +66,28 @@ public final class WebSocketConnection {
             Duration pingInterval,
             Duration pongTimeout,
             Duration writeProgressTimeout,
+            Runnable onClosed) {
+        this(
+                socket,
+                endpoint,
+                timers,
+                closeTimeout,
+                pingInterval,
+                pongTimeout,
+                writeProgressTimeout,
+                new E22Metrics(),
+                onClosed);
+    }
+
+    public WebSocketConnection(
+            AsynchronousSocketChannel socket,
+            WebSocketEndpoint endpoint,
+            ScheduledExecutorService timers,
+            Duration closeTimeout,
+            Duration pingInterval,
+            Duration pongTimeout,
+            Duration writeProgressTimeout,
+            E22Metrics metrics,
             Runnable onClosed) {
         this.socket = Objects.requireNonNull(socket);
         this.endpoint = Objects.requireNonNull(endpoint);
@@ -89,6 +113,7 @@ public final class WebSocketConnection {
                         MAX_QUEUED_FRAMES,
                         scheduler,
                         writeProgressTimeout,
+                        metrics,
                         ignored -> fail(
                                 1011,
                                 "WebSocket write made no progress"));
@@ -98,7 +123,10 @@ public final class WebSocketConnection {
                 pingInterval,
                 pongTimeout,
                 this::sendPing,
-                () -> fail(1001, "WebSocket pong timeout"));
+                () -> {
+                    metrics.recordPongTimeout();
+                    fail(1001, "WebSocket pong timeout");
+                });
     }
 
     public void start(byte[] initialBytes) {

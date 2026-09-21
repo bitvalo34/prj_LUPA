@@ -1,10 +1,12 @@
 package gt.lupa;
 
 import gt.lupa.concurrent.MonotonicScheduler;
+import gt.lupa.concurrent.ShutdownSupport;
 import gt.lupa.concurrent.StorageExecutors;
 import gt.lupa.concurrent.TileReadAdmission;
 import gt.lupa.concurrent.TransientBufferBudget;
 import gt.lupa.config.ServerConfig;
+import gt.lupa.diagnostics.E22Metrics;
 import gt.lupa.http.HttpRouter;
 import gt.lupa.http.NioHttpServer;
 import gt.lupa.protocol.LupaProtocol;
@@ -80,6 +82,9 @@ public final class LupaApplication {
         StorageExecutors storageExecutors =
                 new StorageExecutors(config);
 
+        E22Metrics metrics =
+                new E22Metrics();
+
         ScheduledExecutorService sessionTimers =
                 Executors.newSingleThreadScheduledExecutor(
                         runnable -> {
@@ -111,12 +116,16 @@ public final class LupaApplication {
                                         transientBuffers,
                                         sessionScheduler,
                                         config.helloTimeout(),
-                                        config.releaseTimeout()));
+                                        config.releaseTimeout(),
+                                        metrics),
+                        metrics);
 
         try {
             server.start();
         } catch (Exception e) {
-            sessionTimers.shutdownNow();
+            ShutdownSupport.shutdownNowAndAwait(
+                    sessionTimers,
+                    java.time.Duration.ofSeconds(2));
             storageExecutors.close();
             throw e;
         }
@@ -125,7 +134,9 @@ public final class LupaApplication {
                 new Thread(
                         () -> {
                             server.close();
-                            sessionTimers.shutdownNow();
+                            ShutdownSupport.shutdownNowAndAwait(
+                                    sessionTimers,
+                                    java.time.Duration.ofSeconds(2));
                             storageExecutors.close();
                         },
                         "lupa-shutdown"));
@@ -162,7 +173,9 @@ public final class LupaApplication {
             new CountDownLatch(1).await();
         } finally {
             server.close();
-            sessionTimers.shutdownNow();
+            ShutdownSupport.shutdownNowAndAwait(
+                    sessionTimers,
+                    java.time.Duration.ofSeconds(2));
             storageExecutors.close();
         }
     }

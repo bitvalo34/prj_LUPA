@@ -38,4 +38,15 @@ class StorageExecutorsTest {
             release.countDown();
         }
     }
+
+    @Test
+    void closeTerminatesBothOwnedPools() {
+        StorageExecutors executors =
+                new StorageExecutors(1, 1, 1, 1);
+
+        executors.close();
+        executors.close();
+
+        assertTrue(executors.terminatedForTest());
+    }
 }

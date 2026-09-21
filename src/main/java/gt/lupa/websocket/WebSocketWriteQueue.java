@@ -2,6 +2,7 @@ package gt.lupa.websocket;
 
 import java.nio.ByteBuffer;
 import gt.lupa.concurrent.MonotonicScheduler;
+import gt.lupa.diagnostics.E22Metrics;
 
 import java.nio.channels.CompletionHandler;
 import java.time.Duration;
@@ -22,6 +23,7 @@ public final class WebSocketWriteQueue {
     private final Consumer<Throwable> onFailure;
     private final MonotonicScheduler scheduler;
     private final Duration writeProgressTimeout;
+    private final E22Metrics metrics;
     private final Deque<PendingWrite> queue = new ArrayDeque<>();
     private boolean writePending;
     private boolean failed;
@@ -37,7 +39,13 @@ public final class WebSocketWriteQueue {
             WriteTarget target,
             int maxQueuedFrames,
             Consumer<Throwable> onFailure) {
-        this(target, maxQueuedFrames, null, null, onFailure);
+        this(
+                target,
+                maxQueuedFrames,
+                null,
+                null,
+                new E22Metrics(),
+                onFailure);
     }
 
     public WebSocketWriteQueue(
@@ -45,6 +53,22 @@ public final class WebSocketWriteQueue {
             int maxQueuedFrames,
             MonotonicScheduler scheduler,
             Duration writeProgressTimeout,
+            Consumer<Throwable> onFailure) {
+        this(
+                target,
+                maxQueuedFrames,
+                scheduler,
+                writeProgressTimeout,
+                new E22Metrics(),
+                onFailure);
+    }
+
+    public WebSocketWriteQueue(
+            WriteTarget target,
+            int maxQueuedFrames,
+            MonotonicScheduler scheduler,
+            Duration writeProgressTimeout,
+            E22Metrics metrics,
             Consumer<Throwable> onFailure) {
         this.target = Objects.requireNonNull(target);
         if (maxQueuedFrames < 1) {
@@ -61,6 +85,7 @@ public final class WebSocketWriteQueue {
         this.maxQueuedFrames = maxQueuedFrames;
         this.scheduler = scheduler;
         this.writeProgressTimeout = writeProgressTimeout;
+        this.metrics = Objects.requireNonNull(metrics);
         this.onFailure = Objects.requireNonNull(onFailure);
     }
 
@@ -253,6 +278,7 @@ public final class WebSocketWriteQueue {
                 return;
             }
         }
+        metrics.recordWriteProgressTimeout();
         fail(new IllegalStateException(
                 "socket write made no progress before deadline"));
     }

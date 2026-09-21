@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import gt.lupa.concurrent.MonotonicScheduler;
 import gt.lupa.concurrent.TileReadAdmission;
 import gt.lupa.concurrent.TransientBufferBudget;
+import gt.lupa.diagnostics.E22Metrics;
 import gt.lupa.protocol.LupaControlException;
 import gt.lupa.protocol.LupaJson;
 import gt.lupa.protocol.LupaProtocol;
@@ -51,6 +52,7 @@ public final class LupaSession implements WebSocketEndpoint {
     private final Duration helloTimeout;
     private final Duration releaseTimeout;
     private final SerialExecutor serial;
+    private E22Metrics metrics = new E22Metrics();
     private final LupaJson json = new LupaJson();
     private final ViewPlanner viewPlanner = new ViewPlanner();
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -191,6 +193,34 @@ public final class LupaSession implements WebSocketEndpoint {
                 new DeliveryIdSequence());
     }
 
+    public LupaSession(
+            PublishedImageStore store,
+            TileReader tileReader,
+            Executor stateExecutor,
+            Executor diskExecutor,
+            Executor metadataExecutor,
+            SessionAdmission sessionAdmission,
+            TileReadAdmission tileReadAdmission,
+            TransientBufferBudget transientBuffers,
+            MonotonicScheduler scheduler,
+            Duration helloTimeout,
+            Duration releaseTimeout,
+            E22Metrics metrics) {
+        this(
+                store,
+                tileReader,
+                stateExecutor,
+                diskExecutor,
+                metadataExecutor,
+                sessionAdmission,
+                tileReadAdmission,
+                transientBuffers,
+                scheduler,
+                helloTimeout,
+                releaseTimeout);
+        this.metrics = Objects.requireNonNull(metrics);
+    }
+
     LupaSession(
             PublishedImageStore store,
             TileReader tileReader,
@@ -268,6 +298,7 @@ public final class LupaSession implements WebSocketEndpoint {
         releaseAdmission();
         releaseAllTransientBuffers();
         if (!cleanupScheduled.compareAndSet(false, true)) return;
+        metrics.recordSessionCleanupRun();
         try {
             serial.execute(() -> {
                 state = LupaSessionState.CERRADA;
@@ -288,6 +319,7 @@ public final class LupaSession implements WebSocketEndpoint {
         admissionLease = null;
         if (lease != null) {
             lease.close();
+            metrics.recordSessionRelease();
         }
     }
 
@@ -556,7 +588,10 @@ public final class LupaSession implements WebSocketEndpoint {
 
     private void onPlanCommitted(long generation) {
         ActivePlan plan = activePlan;
-        if (plan == null || plan.generation != generation) return;
+        if (plan == null || plan.generation != generation) {
+            metrics.recordLateCallbackDiscarded();
+            return;
+        }
         plan.planCommitted = true;
         pump();
     }
@@ -702,6 +737,7 @@ public final class LupaSession implements WebSocketEndpoint {
             TileReadAdmission.Lease lease) {
         ActivePlan plan = activePlan;
         if (closed.get() || plan == null || plan.generation != generation) {
+            metrics.recordLateCallbackDiscarded();
             lease.close();
             return;
         }
@@ -801,6 +837,7 @@ public final class LupaSession implements WebSocketEndpoint {
             TileReadException failure) {
         ActivePlan plan = activePlan;
         if (plan == null || plan.generation != generation) {
+            metrics.recordLateCallbackDiscarded();
             if (tile != null) tile.close();
             return;
         }
@@ -1124,6 +1161,7 @@ public final class LupaSession implements WebSocketEndpoint {
                 || state != LupaSessionState.ESPERA_HELLO) {
             return;
         }
+        metrics.recordHelloTimeout();
         closeForTimeout("HELLO timeout");
     }
 
@@ -1156,6 +1194,7 @@ public final class LupaSession implements WebSocketEndpoint {
             return;
         }
 
+        metrics.recordReleaseTimeout();
         diagnosticCredits(
                 "RELEASE_TIMEOUT",
                 deliveryId,

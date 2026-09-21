@@ -80,8 +80,17 @@ public final class StorageExecutors implements AutoCloseable {
     @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) return;
-        disk.shutdownNow();
-        metadata.shutdownNow();
+        ShutdownSupport.shutdownNowAndAwait(
+                disk,
+                java.time.Duration.ofSeconds(2));
+        ShutdownSupport.shutdownNowAndAwait(
+                metadata,
+                java.time.Duration.ofSeconds(2));
+    }
+
+    boolean terminatedForTest() {
+        return disk.isTerminated()
+                && metadata.isTerminated();
     }
 
     private static ThreadFactory namedFactory(String prefix) {
