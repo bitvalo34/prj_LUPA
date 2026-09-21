@@ -64,6 +64,7 @@ public final class LupaSession implements WebSocketEndpoint {
     private long bitmapBudgetBytes;
     private final DeliveryIdSequence deliveryIds;
     private long planGeneration;
+    private long tileTurnsGranted;
     private boolean thumbnailCommittedForOpen;
     private PublishedImageStore.OpenedImage opened;
     private ActivePlan activePlan;
@@ -567,6 +568,7 @@ public final class LupaSession implements WebSocketEndpoint {
 
         TileReadAdmission.AcquireResult admission =
                 tileReadAdmission.acquireOrQueue(
+                        diagnosticSessionId,
                         lease -> onReadPermitGrantedAsync(plan.generation, lease));
 
         if (!admission.accepted()) {
@@ -637,6 +639,12 @@ public final class LupaSession implements WebSocketEndpoint {
         boolean openingThumbnail =
                 descriptor.role() == ViewPlanner.TileRole.OPENING_THUMBNAIL;
         plan.busy = true;
+        tileTurnsGranted++;
+        diagnostic(
+                "TURN",
+                "generation=" + plan.generation
+                        + " epoch=" + plan.view.epoch()
+                        + " turn=" + tileTurnsGranted);
         long generation = plan.generation;
         PublishedImageStore.OpenedImage imageAtRead = opened;
 
@@ -1171,6 +1179,7 @@ public final class LupaSession implements WebSocketEndpoint {
                 reserved,
                 deliveries.size(),
                 deliveryIds.nextValue(),
+                tileTurnsGranted,
                 opened == null ? null : opened.catalogImage().imageId(),
                 activePlan == null ? null : activePlan.view.epoch());
     }
@@ -1183,6 +1192,7 @@ public final class LupaSession implements WebSocketEndpoint {
             long reservedBytes,
             int pendingDeliveries,
             long nextDeliveryId,
+            long tileTurnsGranted,
             String openedImageId,
             Integer activePlanEpoch) {}
 
