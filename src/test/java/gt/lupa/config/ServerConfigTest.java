@@ -17,13 +17,75 @@ class ServerConfigTest {
     }
 
     @Test
+    void e22DefaultsDistinguishConnectionsWebSocketsAndSessions() {
+        ServerConfig config = ServerConfig.defaults();
+        assertEquals(128, config.maxConnections());
+        assertEquals(64, config.maxWebSocketConnections());
+        assertEquals(32, config.maxSessions());
+        assertTrue(config.maxSessions() <= config.maxWebSocketConnections());
+        assertTrue(config.maxWebSocketConnections() <= config.maxConnections());
+        assertEquals(64, config.diskQueueCapacity());
+        assertEquals(32, config.metadataQueueCapacity());
+        assertTrue(config.diskThreads() > 0);
+        assertTrue(config.metadataThreads() > 0);
+    }
+
+    @Test
+    void e22ResourceLimitsAreConfigurable() {
+        ServerConfig config = ServerConfig.fromArgs(new String[]{
+                "--max-connections=20",
+                "--max-ws-connections=12",
+                "--max-sessions=7",
+                "--worker-threads=3",
+                "--worker-queue-capacity=17",
+                "--io-threads=2",
+                "--disk-threads=2",
+                "--disk-queue-capacity=9",
+                "--metadata-threads=1",
+                "--metadata-queue-capacity=5",
+                "--ws-close-timeout-ms=750"
+        });
+
+        assertEquals(20, config.maxConnections());
+        assertEquals(12, config.maxWebSocketConnections());
+        assertEquals(7, config.maxSessions());
+        assertEquals(3, config.workerThreads());
+        assertEquals(17, config.workerQueueCapacity());
+        assertEquals(2, config.ioThreads());
+        assertEquals(2, config.diskThreads());
+        assertEquals(9, config.diskQueueCapacity());
+        assertEquals(1, config.metadataThreads());
+        assertEquals(5, config.metadataQueueCapacity());
+        assertEquals(750, config.webSocketCloseTimeout().toMillis());
+    }
+
+    @Test
+    void incoherentAdmissionLimitsAreRejected() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ServerConfig.fromArgs(new String[]{
+                        "--max-connections=10",
+                        "--max-ws-connections=11"
+                }));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ServerConfig.fromArgs(new String[]{
+                        "--max-connections=10",
+                        "--max-ws-connections=8",
+                        "--max-sessions=9"
+                }));
+    }
+
+    @Test
     void dataRootDerivesTheCatalogPathAndFixtureRemainsExplicit() {
         Path root = Path.of("target", "i19-config-data").toAbsolutePath().normalize();
         ServerConfig file = ServerConfig.fromArgs(new String[]{"--data-root=" + root});
         assertEquals(root, file.dataRoot());
         assertEquals(root.resolve("catalog.json"), file.catalogPath());
 
-        ServerConfig fixture = ServerConfig.fromArgs(new String[]{"--catalog=fixture", "--data-root=" + root});
+        ServerConfig fixture =
+                ServerConfig.fromArgs(new String[]{"--catalog=fixture", "--data-root=" + root});
         assertEquals("fixture", fixture.catalogMode());
     }
 
@@ -36,7 +98,6 @@ class ServerConfigTest {
                 () -> ServerConfig.fromArgs(new String[]{
                         "--data-root=" + root,
                         "--catalog-path=" + other
-                })
-        );
+                }));
     }
 }

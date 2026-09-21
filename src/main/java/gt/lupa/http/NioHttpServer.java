@@ -35,6 +35,7 @@ public final class NioHttpServer implements AutoCloseable {
     private final HttpRouter router;
     private final HttpParser parser = new HttpParser();
     private final Semaphore connectionSlots;
+    private final Semaphore webSocketSlots;
     private final Set<Connection> connections = ConcurrentHashMap.newKeySet();
     private final ThreadPoolExecutor workers;
     private final ScheduledExecutorService timers;
@@ -58,7 +59,8 @@ public final class NioHttpServer implements AutoCloseable {
         this.config = config;
         this.router = router;
         this.webSocketEndpointFactory = webSocketEndpointFactory;
-        this.connectionSlots = new Semaphore(config.maxConnections());
+        this.connectionSlots = new Semaphore(config.maxConnections(), true);
+        this.webSocketSlots = new Semaphore(config.maxWebSocketConnections(), true);
         this.workers = new ThreadPoolExecutor(
                 config.workerThreads(), config.workerThreads(), 0L, TimeUnit.MILLISECONDS,
                 new ArrayBlockingQueue<>(config.workerQueueCapacity()),
@@ -90,6 +92,20 @@ public final class NioHttpServer implements AutoCloseable {
             throw new IllegalStateException("cannot obtain local address", e);
         }
     }
+
+    ServerSnapshot snapshotForTest() {
+        return new ServerSnapshot(
+                connections.size(),
+                config.maxWebSocketConnections() - webSocketSlots.availablePermits(),
+                workers.getActiveCount(),
+                workers.getQueue().size());
+    }
+
+    record ServerSnapshot(
+            int activeConnections,
+            int activeWebSockets,
+            int activeWorkers,
+            int queuedWorkerTasks) {}
 
     private void acceptNext() {
         if (!running.get()) return;
@@ -144,6 +160,7 @@ public final class NioHttpServer implements AutoCloseable {
         private final ByteBuffer readBuffer = ByteBuffer.allocate(4096);
         private final AtomicBoolean finished = new AtomicBoolean();
         private final AtomicBoolean responseStarted = new AtomicBoolean();
+        private final AtomicBoolean webSocketSlotHeld = new AtomicBoolean();
         private ScheduledFuture<?> timeout;
 
         private Connection(AsynchronousSocketChannel socket) {
@@ -235,7 +252,18 @@ public final class NioHttpServer implements AutoCloseable {
                 return;
             }
             WebSocketHandshake.Accepted accepted = (WebSocketHandshake.Accepted) result;
-            if (finished.get() || !responseStarted.compareAndSet(false, true)) return;
+            if (!webSocketSlots.tryAcquire()) {
+                respondOnce(
+                        ResponseFactory.error(503, "server WebSocket capacity is full"),
+                        request.method().equals("HEAD"));
+                return;
+            }
+            webSocketSlotHeld.set(true);
+
+            if (finished.get() || !responseStarted.compareAndSet(false, true)) {
+                releaseWebSocketSlot();
+                return;
+            }
             cancelTimeout();
             new AsyncWritePump(
                     (buffer, handler) -> socket.write(buffer, null, handler),
@@ -258,7 +286,7 @@ public final class NioHttpServer implements AutoCloseable {
                     socket,
                     endpoint,
                     timers,
-                    Duration.ofSeconds(2),
+                    config.webSocketCloseTimeout(),
                     this::finish).start(trailing);
         }
 
@@ -277,11 +305,18 @@ public final class NioHttpServer implements AutoCloseable {
             if (current != null) current.cancel(false);
         }
 
+        private void releaseWebSocketSlot() {
+            if (webSocketSlotHeld.compareAndSet(true, false)) {
+                webSocketSlots.release();
+            }
+        }
+
         private void finish() {
             if (!finished.compareAndSet(false, true)) return;
             cancelTimeout();
             closeQuietly(socket);
             connections.remove(this);
+            releaseWebSocketSlot();
             connectionSlots.release();
         }
     }

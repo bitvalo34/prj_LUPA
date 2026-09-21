@@ -19,7 +19,14 @@ public record ServerConfig(
         Duration headerTimeout,
         int maxResourceBytes,
         int maxCatalogBytes,
-        boolean webSocketAllowNoOrigin) {
+        boolean webSocketAllowNoOrigin,
+        int maxWebSocketConnections,
+        int maxSessions,
+        int diskThreads,
+        int diskQueueCapacity,
+        int metadataThreads,
+        int metadataQueueCapacity,
+        Duration webSocketCloseTimeout) {
 
     public ServerConfig(
             String host,
@@ -50,6 +57,43 @@ public record ServerConfig(
                 true);
     }
 
+    public ServerConfig(
+            String host,
+            int port,
+            String catalogMode,
+            Path catalogPath,
+            int maxHeaderBytes,
+            int maxConnections,
+            int workerThreads,
+            int workerQueueCapacity,
+            int ioThreads,
+            Duration headerTimeout,
+            int maxResourceBytes,
+            int maxCatalogBytes,
+            boolean webSocketAllowNoOrigin) {
+        this(
+                host,
+                port,
+                catalogMode,
+                catalogPath,
+                maxHeaderBytes,
+                maxConnections,
+                workerThreads,
+                workerQueueCapacity,
+                ioThreads,
+                headerTimeout,
+                maxResourceBytes,
+                maxCatalogBytes,
+                webSocketAllowNoOrigin,
+                Math.min(64, maxConnections),
+                Math.min(32, Math.min(64, maxConnections)),
+                defaultDiskThreads(),
+                64,
+                defaultMetadataThreads(),
+                32,
+                Duration.ofSeconds(2));
+    }
+
     public ServerConfig {
         if (host == null || host.isBlank()) throw new IllegalArgumentException("host is required");
         if (port < 0 || port > 65535) throw new IllegalArgumentException("port must be 0..65535");
@@ -59,12 +103,26 @@ public record ServerConfig(
         if (catalogPath == null) throw new IllegalArgumentException("catalogPath is required");
         catalogPath = catalogPath.toAbsolutePath().normalize();
         if (maxHeaderBytes < 1024) throw new IllegalArgumentException("maxHeaderBytes too small");
-        if (maxConnections < 1 || workerThreads < 1 || workerQueueCapacity < 1 || ioThreads < 1) {
-            throw new IllegalArgumentException("thread/queue/connection limits must be positive");
+        if (maxConnections < 1
+                || workerThreads < 1
+                || workerQueueCapacity < 1
+                || ioThreads < 1
+                || maxWebSocketConnections < 1
+                || maxSessions < 1
+                || diskThreads < 1
+                || diskQueueCapacity < 1
+                || metadataThreads < 1
+                || metadataQueueCapacity < 1) {
+            throw new IllegalArgumentException("thread/queue/connection/session limits must be positive");
         }
-        if (headerTimeout == null || headerTimeout.isZero() || headerTimeout.isNegative()) {
-            throw new IllegalArgumentException("headerTimeout must be positive");
+        if (maxWebSocketConnections > maxConnections) {
+            throw new IllegalArgumentException("maxWebSocketConnections cannot exceed maxConnections");
         }
+        if (maxSessions > maxWebSocketConnections) {
+            throw new IllegalArgumentException("maxSessions cannot exceed maxWebSocketConnections");
+        }
+        requirePositive(headerTimeout, "headerTimeout");
+        requirePositive(webSocketCloseTimeout, "webSocketCloseTimeout");
         if (maxResourceBytes < 1 || maxCatalogBytes < 1) {
             throw new IllegalArgumentException("byte limits must be positive");
         }
@@ -76,7 +134,7 @@ public record ServerConfig(
     }
 
     public static ServerConfig defaults() {
-        int cpus = Math.max(2, Runtime.getRuntime().availableProcessors());
+        int cpus = availableProcessors();
         Path dataRoot = Path.of("data").toAbsolutePath().normalize();
         return new ServerConfig(
                 "127.0.0.1",
@@ -91,8 +149,14 @@ public record ServerConfig(
                 Duration.ofSeconds(5),
                 1024 * 1024,
                 256 * 1024,
-                true
-        );
+                true,
+                64,
+                32,
+                Math.min(4, cpus),
+                64,
+                Math.min(2, cpus),
+                32,
+                Duration.ofSeconds(2));
     }
 
     public static ServerConfig fromArgs(String[] args) {
@@ -116,8 +180,13 @@ public record ServerConfig(
         for (String key : values.keySet()) {
             if (!switch (key) {
                 case "host", "port", "catalog", "data-root", "catalog-path",
-                        "max-header-bytes", "max-connections", "header-timeout-ms",
-                        "ws-allow-no-origin" -> true;
+                        "max-header-bytes", "max-connections",
+                        "worker-threads", "worker-queue-capacity", "io-threads",
+                        "header-timeout-ms", "ws-allow-no-origin",
+                        "max-ws-connections", "max-sessions",
+                        "disk-threads", "disk-queue-capacity",
+                        "metadata-threads", "metadata-queue-capacity",
+                        "ws-close-timeout-ms" -> true;
                 default -> false;
             }) {
                 throw new IllegalArgumentException("unknown argument: --" + key);
@@ -147,17 +216,44 @@ public record ServerConfig(
                 catalogPath,
                 parseInt(values, "max-header-bytes", defaults.maxHeaderBytes()),
                 parseInt(values, "max-connections", defaults.maxConnections()),
-                defaults.workerThreads(),
-                defaults.workerQueueCapacity(),
-                defaults.ioThreads(),
+                parseInt(values, "worker-threads", defaults.workerThreads()),
+                parseInt(values, "worker-queue-capacity", defaults.workerQueueCapacity()),
+                parseInt(values, "io-threads", defaults.ioThreads()),
                 Duration.ofMillis(parseInt(
                         values,
                         "header-timeout-ms",
                         (int) defaults.headerTimeout().toMillis())),
                 defaults.maxResourceBytes(),
                 defaults.maxCatalogBytes(),
-                parseBoolean(values, "ws-allow-no-origin", defaults.webSocketAllowNoOrigin())
-        );
+                parseBoolean(values, "ws-allow-no-origin", defaults.webSocketAllowNoOrigin()),
+                parseInt(values, "max-ws-connections", defaults.maxWebSocketConnections()),
+                parseInt(values, "max-sessions", defaults.maxSessions()),
+                parseInt(values, "disk-threads", defaults.diskThreads()),
+                parseInt(values, "disk-queue-capacity", defaults.diskQueueCapacity()),
+                parseInt(values, "metadata-threads", defaults.metadataThreads()),
+                parseInt(values, "metadata-queue-capacity", defaults.metadataQueueCapacity()),
+                Duration.ofMillis(parseInt(
+                        values,
+                        "ws-close-timeout-ms",
+                        (int) defaults.webSocketCloseTimeout().toMillis())));
+    }
+
+    private static void requirePositive(Duration value, String name) {
+        if (value == null || value.isZero() || value.isNegative()) {
+            throw new IllegalArgumentException(name + " must be positive");
+        }
+    }
+
+    private static int availableProcessors() {
+        return Math.max(2, Runtime.getRuntime().availableProcessors());
+    }
+
+    private static int defaultDiskThreads() {
+        return Math.min(4, availableProcessors());
+    }
+
+    private static int defaultMetadataThreads() {
+        return Math.min(2, availableProcessors());
     }
 
     private static Path normalizedPath(String value, String name) {

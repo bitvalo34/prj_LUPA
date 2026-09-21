@@ -37,12 +37,14 @@ public final class LupaSession implements WebSocketEndpoint {
     private final TileReader tileReader;
     private final Executor diskExecutor;
     private final Executor metadataExecutor;
+    private final SessionAdmission sessionAdmission;
     private final SerialExecutor serial;
     private final LupaJson json = new LupaJson();
     private final ViewPlanner viewPlanner = new ViewPlanner();
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicBoolean cleanupScheduled = new AtomicBoolean();
     private final Map<Integer, DeliveryReservation> deliveries = new LinkedHashMap<>();
+    private volatile SessionAdmission.Lease admissionLease;
     private final int diagnosticSessionId = SESSION_IDS.incrementAndGet();
 
     private volatile Sender sender;
@@ -87,6 +89,23 @@ public final class LupaSession implements WebSocketEndpoint {
         this.tileReader = Objects.requireNonNull(tileReader);
         this.diskExecutor = Objects.requireNonNull(diskExecutor);
         this.metadataExecutor = Objects.requireNonNull(metadataExecutor);
+        this.sessionAdmission = null;
+        this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
+        this.deliveryIds = new DeliveryIdSequence();
+    }
+
+    public LupaSession(
+            PublishedImageStore store,
+            TileReader tileReader,
+            Executor stateExecutor,
+            Executor diskExecutor,
+            Executor metadataExecutor,
+            SessionAdmission sessionAdmission) {
+        this.store = Objects.requireNonNull(store);
+        this.tileReader = Objects.requireNonNull(tileReader);
+        this.diskExecutor = Objects.requireNonNull(diskExecutor);
+        this.metadataExecutor = Objects.requireNonNull(metadataExecutor);
+        this.sessionAdmission = Objects.requireNonNull(sessionAdmission);
         this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
         this.deliveryIds = new DeliveryIdSequence();
     }
@@ -102,6 +121,7 @@ public final class LupaSession implements WebSocketEndpoint {
         this.tileReader = Objects.requireNonNull(tileReader);
         this.diskExecutor = Objects.requireNonNull(diskExecutor);
         this.metadataExecutor = Objects.requireNonNull(metadataExecutor);
+        this.sessionAdmission = null;
         this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
         this.deliveryIds = new DeliveryIdSequence(firstDeliveryId);
     }
@@ -121,6 +141,7 @@ public final class LupaSession implements WebSocketEndpoint {
     @Override
     public void onClosed(int code, String reason) {
         closed.set(true);
+        releaseAdmission();
         if (!cleanupScheduled.compareAndSet(false, true)) return;
         try {
             serial.execute(() -> {
@@ -132,6 +153,14 @@ public final class LupaSession implements WebSocketEndpoint {
             });
         } catch (RejectedExecutionException ignored) {
             // The connection is terminal and the session becomes unreachable with the transport.
+        }
+    }
+
+    private void releaseAdmission() {
+        SessionAdmission.Lease lease = admissionLease;
+        admissionLease = null;
+        if (lease != null) {
+            lease.close();
         }
     }
 
@@ -191,6 +220,22 @@ public final class LupaSession implements WebSocketEndpoint {
             sendError(sender, null, LupaProtocol.ErrorCode.LIMIT_EXCEEDED,
                     "bitmapBudgetBytes must be at least " + LupaProtocol.BITMAP_RESERVED_BYTES);
             return;
+        }
+
+        if (sessionAdmission != null) {
+            SessionAdmission.Lease lease = sessionAdmission.tryAcquire();
+            if (lease == null) {
+                sendError(
+                        sender,
+                        null,
+                        LupaProtocol.ErrorCode.LIMIT_EXCEEDED,
+                        "server active-session limit reached");
+                closed.set(true);
+                state = LupaSessionState.CERRADA;
+                sender.close(1013, "server active-session limit reached");
+                return;
+            }
+            admissionLease = lease;
         }
 
         negotiatedWindowBytes = (int) Math.min(requestedWindow, LupaProtocol.MAX_WINDOW_BYTES);
