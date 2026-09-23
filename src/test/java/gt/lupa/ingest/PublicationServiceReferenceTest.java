@@ -1,12 +1,18 @@
 package gt.lupa.ingest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import gt.lupa.storage.CatalogException;
+import gt.lupa.storage.CatalogImage;
+import gt.lupa.storage.CatalogJson;
 import gt.lupa.storage.CatalogPublisher;
+import gt.lupa.storage.CatalogSnapshot;
 import gt.lupa.storage.ImageLevel;
 import gt.lupa.storage.ImageManifest;
 import java.nio.file.Files;
@@ -93,5 +99,86 @@ class PublicationServiceReferenceTest {
         JsonNode metadata = new ObjectMapper().readTree(privateVersion.resolve("import-metadata.json").toFile());
         assertEquals("reference", metadata.path("originalPolicy").asText());
         assertEquals(original.toAbsolutePath().normalize().toString(), metadata.path("privateOriginalPath").asText());
+    }
+
+    @Test
+    void catalogFailureKeepsPreviousCatalogAndLeavesCompleteVersionUnreferenced() throws Exception {
+        Path original = temp.resolve("second-source.tif");
+        Files.write(original, new byte[]{9, 8, 7, 6});
+        Path dataRoot = temp.resolve("data-failure");
+        StorageLayout layout = new StorageLayout(dataRoot);
+        layout.initialize();
+
+        CatalogPublisher publisher = new CatalogPublisher();
+        publisher.publish(
+                layout.catalog(),
+                new CatalogImage("existing", "v1", 64, 64, 256, 0));
+        byte[] catalogBefore = Files.readAllBytes(layout.catalog());
+
+        Path job = layout.createJobDirectory();
+        Path stagedVersion = job.resolve("publish/photo/v1");
+        Files.createDirectories(stagedVersion.resolve("tiles/0"));
+        Files.writeString(stagedVersion.resolve("manifest.json"), "{}\n");
+
+        IngestCliConfig config = new IngestCliConfig(
+                original,
+                "photo",
+                "Photo",
+                "Private permission",
+                dataRoot,
+                "vips",
+                "vipsheader",
+                Duration.ofSeconds(10),
+                85,
+                OriginalPolicy.REFERENCE
+        );
+        ImageInspection inspection = new ImageInspection(
+                original,
+                original.toString(),
+                ActualFormat.TIFF,
+                "tiffload",
+                100,
+                80,
+                3,
+                "srgb",
+                false,
+                1
+        );
+        PreflightReport preflight = new PreflightReport(
+                original,
+                Files.size(original),
+                "tif",
+                dataRoot,
+                Files.getFileStore(dataRoot).getUsableSpace(),
+                "vips-8.15.1",
+                false
+        );
+        ImageManifest manifest = new ImageManifest(
+                1,
+                "photo",
+                "v1",
+                100,
+                80,
+                256,
+                0,
+                "onetile",
+                List.of(new ImageLevel(0, 100, 80))
+        );
+        StagingResult staging = new StagingResult(job, stagedVersion, "photo", "v1", 100, 80, 0, 1);
+        PyramidValidationReport validation = new PyramidValidationReport(manifest, 1, 1234);
+
+        PublicationService service = new PublicationService((catalogPath, image) -> {
+            throw new CatalogException("A22 injected catalog failure");
+        });
+        IngestException failure = assertThrows(
+                IngestException.class,
+                () -> service.publish(config, inspection, preflight, staging, validation));
+
+        assertTrue(failure.getMessage().contains("previous catalog remains valid"));
+        assertArrayEquals(catalogBefore, Files.readAllBytes(layout.catalog()));
+        CatalogSnapshot stillPublished = new CatalogJson().parseCatalog(Files.readAllBytes(layout.catalog()));
+        assertEquals(List.of("existing"), stillPublished.images().stream().map(CatalogImage::imageId).toList());
+        assertTrue(Files.exists(dataRoot.resolve("pyramids/photo/v1/manifest.json")),
+                "the complete immutable version remains available for manual recovery");
     }
 }

@@ -59,11 +59,21 @@ class I19CatalogIntegrationTest {
         assertEquals(first.header("content-length"), head.header("content-length"));
         assertEquals(0, head.body.length);
 
+        publisher.publish(catalogPath, new CatalogImage("other", "v1", 640, 480, 256, 2));
+        RawResponse withSecondImage = request("GET /api/catalog HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        assertEquals(200, withSecondImage.status);
+        JsonNode withSecondImageJson = new ObjectMapper().readTree(withSecondImage.body);
+        assertEquals(2, withSecondImageJson.get("images").size());
+        assertEquals("v1", catalogVersion(withSecondImageJson, "photo"));
+        assertEquals("v1", catalogVersion(withSecondImageJson, "other"));
+
         publisher.publish(catalogPath, new CatalogImage("photo", "v2", 300, 257, 256, 1));
         RawResponse refreshed = request("GET /api/catalog HTTP/1.1\r\nHost: localhost\r\n\r\n");
         assertEquals(200, refreshed.status);
         JsonNode refreshedJson = new ObjectMapper().readTree(refreshed.body);
-        assertEquals("v2", refreshedJson.get("images").get(0).get("imageVersion").asText());
+        assertEquals(2, refreshedJson.get("images").size());
+        assertEquals("v2", catalogVersion(refreshedJson, "photo"));
+        assertEquals("v1", catalogVersion(refreshedJson, "other"));
     }
 
     @Test
@@ -125,6 +135,15 @@ class I19CatalogIntegrationTest {
         );
         server.start();
         port = server.port();
+    }
+
+    private static String catalogVersion(JsonNode catalog, String imageId) {
+        for (JsonNode image : catalog.path("images")) {
+            if (imageId.equals(image.path("imageId").asText())) {
+                return image.path("imageVersion").asText();
+            }
+        }
+        throw new AssertionError("missing catalog image " + imageId);
     }
 
     private RawResponse request(String request) throws Exception {

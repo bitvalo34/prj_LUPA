@@ -2,9 +2,9 @@
 
 LUPA (Lectura Ultraresolutiva Progresiva y Adaptativa) — servidor asíncrono académico en Java 21.
 
-## Base integrada S19 + E19 + A19 + I19 + E20 + A20 + I20 + E21
+## Base integrada hasta E22
 
-El transporte y control E21 están incorporados a `main`. A21 amplía el visor **LUPA 64** con desplazamiento, zoom real por VIEW, detalle `-2/-1/0`, lente con foco fijo, composición contexto-detalle y liberación de recursos por época.
+`main` incorpora S19, E19/A19/I19, E20/A20/I20, E21/A21/I21 y E22. A22 endurece la revisión funcional del visor: segunda imagen y versiones sin reinicio, recuperación de errores, reconexión, contadores y evidencia de memoria.
 
 Requisitos de desarrollo comprobados:
 
@@ -53,3 +53,7 @@ Documentación:
 - `docs/A20-E20-integration.md` — frontera exacta entre visor y transporte.
 - `docs/E21.md` — estado, planificación, foco, épocas y créditos del servidor.
 - `docs/A21.md` — navegación, lente, memoria y verificación del cliente.
+- `docs/I21.md` — integración de control, dos clientes y reconexión.
+- `docs/E22.md` y `docs/E22_EVIDENCE.md` — concurrencia, límites y recursos del servidor.
+- `docs/A22.md` — segunda imagen, versiones, fallo de importación, visor y memoria.
+- `docs/evidencias/A22.md` — matriz de evidencia y pendientes de validación real.

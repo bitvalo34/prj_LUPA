@@ -188,12 +188,7 @@ public final class NioHttpServer implements AutoCloseable {
         running.set(false);
         if (server != null) closeQuietly(server);
         for (Connection connection : connections.toArray(Connection[]::new)) connection.finish();
-        ShutdownSupport.shutdownNowAndAwait(
-                workers,
-                Duration.ofSeconds(2));
-        ShutdownSupport.shutdownNowAndAwait(
-                timers,
-                Duration.ofSeconds(2));
+        // Drain I/O callbacks before their worker and timer dependencies are stopped.
         if (ioGroup != null) {
             try {
                 ioGroup.shutdownNow();
@@ -205,6 +200,12 @@ public final class NioHttpServer implements AutoCloseable {
                 Thread.currentThread().interrupt();
             }
         }
+        ShutdownSupport.shutdownNowAndAwait(
+                workers,
+                Duration.ofSeconds(2));
+        ShutdownSupport.shutdownNowAndAwait(
+                timers,
+                Duration.ofSeconds(2));
     }
 
     private final class Connection {
