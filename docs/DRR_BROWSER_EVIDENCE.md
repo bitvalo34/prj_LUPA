@@ -137,3 +137,39 @@ Si no aparece `selectionVisits > 1`, no significa que DRR haya fallado: puede oc
 que todos los costos observados quepan en el déficit disponible. En ese caso se
 repite con `--drr-quantum-bytes=4096` para hacer la diferencia más visible, sin
 cambiar el algoritmo.
+
+
+## Evidencia real observada — 23 de septiembre de 2026
+
+La prueba se ejecutó con dos navegadores reales, `max-tile-reads=1`,
+`drr-quantum-bytes=8192` y `lupa.drr.diag.readDelayMs=100`.
+
+La traza observada demuestra concurrencia real y rotación DRR:
+
+- la sesión 3 ya estaba sirviendo teselas cuando la sesión 2 abrió la misma imagen;
+- desde ese punto ambas sesiones alternaron turnos;
+- `inFlight` permaneció en 1 durante la competencia;
+- se observaron costos JPEG reales distintos;
+- hubo múltiples selecciones con `selectionVisits > 1`, incluyendo valores de 2 y 3;
+- ambas sesiones continuaron progresando hasta agotar sus respectivos planes.
+
+Fragmento representativo:
+
+```text
+session=3 event=TURN ... turn=5
+session=2 event=OPEN ... image=demo-auxiliar/v1
+session=3 event=DRR_CHARGE bytes=2683 quantum=8192 selectionVisits=1 ... inFlight=1
+session=2 event=TURN ... turn=1
+...
+session=3 event=DRR_CHARGE bytes=19141 quantum=8192 selectionVisits=3 ...
+session=2 event=TURN ... turn=3
+session=2 event=DRR_CHARGE bytes=9168 quantum=8192 selectionVisits=3 ...
+```
+
+Esto constituye evidencia funcional de que el scheduler ya no opera como FIFO puro:
+un owner puede necesitar varias visitas para acumular déficit suficiente antes de
+volver a ser elegible, mientras la otra sesión continúa progresando.
+
+El archivo de evidencia se conserva en:
+
+`docs/evidence/drr-real-browser-2026-09-23.txt`
