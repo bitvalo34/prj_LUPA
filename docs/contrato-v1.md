@@ -692,3 +692,215 @@ S19 únicamente fija las interfaces y acuerdos para que esas tareas no diverjan.
 | Modalidad exacta, hora y detalles de archivos del GES | sección 14 | **pendiente** |
 
 S19 queda técnicamente documentada. No debe marcarse como completamente cerrada hasta que Adrian revise los acuerdos que le afectan y se confirmen los datos académicos todavía pendientes.
+
+
+---
+
+## 17. Addendum I22 — implementación real validada offline
+
+**Fecha de validación:** 23 de septiembre de 2026  
+**Base probada:** `f5dee50` (merge de PR #16)  
+**Alcance:** actualización documental del contrato v1; no cambia la versión de protocolo.
+
+Este addendum conserva las decisiones históricas de S19 y documenta las concreciones
+que ya existen en E20–E22, A20–A22 e integración posterior. Cuando esta sección
+contradice una descripción antigua marcada como "futura" o "pendiente" en S19,
+prevalece la implementación real descrita aquí.
+
+### 17.1 Runtime y superficie pública
+
+La aplicación de producción utiliza:
+
+- backend Java 21 con Java NIO.2;
+- `AsynchronousServerSocketChannel` para aceptar TCP;
+- HTTP/1.1 y WebSocket RFC 6455 implementados en Java;
+- frontend React 19 + TypeScript + Vite, construido a
+  `src/main/resources/web` y servido desde el mismo JAR;
+- Web Worker local para decodificación JPEG;
+- Canvas 2D para composición;
+- sin Service Worker.
+
+La superficie HTTP pública permanece limitada a:
+
+```text
+GET/HEAD /
+GET/HEAD /assets/*
+GET/HEAD /api/catalog
+GET /lupa + Upgrade: websocket
+```
+
+`originals`, `staging`, manifiestos físicos y teselas no se exponen como rutas
+HTTP genéricas. I22 verificó 404 para intentos directos a originales y staging.
+
+### 17.2 WebSocket y secuencia LUPA
+
+El navegador inicia el WebSocket sobre la misma dirección del servidor Java y ofrece:
+
+```text
+Sec-WebSocket-Protocol: lupa.v1
+```
+
+Una negociación válida responde `101 Switching Protocols`. La sesión de aplicación
+continúa con:
+
+```text
+HELLO -> WELCOME
+OPEN -> MANIFEST
+VIEW -> PLAN
+TILE* -> DONE
+```
+
+Cada VIEW usa una época creciente. Una intención más nueva invalida trabajo anterior;
+callbacks tardíos y resultados de una conexión anterior no pueden reactivar un plan
+obsoleto.
+
+### 17.3 PLAN, niveles, foco y coordenadas
+
+`PLAN` informa `appliedLevel` y `contextLevel`. El rectángulo VIEW se expresa en
+coordenadas de la imagen original; `viewportPx` y `focus.radiusPx` usan píxeles
+físicos del viewport.
+
+Valores soportados:
+
+```text
+detailOffset = -2 | -1 | 0
+mode = uniform | focus
+```
+
+La prioridad interna del plan es miniatura inicial cuando aplica, contexto mínimo,
+foco visible y resto visible.
+
+### 17.4 TILE y confirmaciones
+
+El envelope TILE conserva:
+
+```text
+4 bytes H (network byte order)
+H bytes de cabecera JSON UTF-8
+payload JPEG
+```
+
+con:
+
+```text
+cabecera JSON <= 4096 bytes
+JPEG <= 262144 bytes
+tile <= 256 x 256
+codec = jpeg
+```
+
+El navegador actual utiliza **Selective Tile Acknowledgment (STA)**:
+
+```json
+{
+  "type": "ACK_STATE",
+  "epoch": 8,
+  "received": [[31, 36], [39, 44]],
+  "missing": [37, 38]
+}
+```
+
+`received` libera exactamente las reservas terminales indicadas. `missing`
+solicita recuperación selectiva sin crear una segunda reserva y reutiliza el mismo
+`deliveryId`. El servidor limita la recuperación selectiva a dos reintentos por
+delivery. `RELEASE` se conserva por compatibilidad con LUPA v1 y herramientas
+anteriores, pero el frontend actual ejercita `ACK_STATE`.
+
+La ventana de créditos sigue cumpliendo:
+
+```text
+freeWindowBytes + reservedBytes = negotiatedWindowBytes
+```
+
+### 17.5 Concurrencia y fairness
+
+La admisión global de lecturas usa **Deficit Round Robin (DRR)** por sesión, con costo
+basado en bytes JPEG comprimidos.
+
+Defaults relevantes:
+
+```text
+maxConnections = 128
+maxWebSocketConnections = 64
+maxSessions = 32
+maxTileReads = 8
+drrQuantumBytes = 131072
+tileCacheBytes = 128 MiB
+transientTileBytes = 16 MiB
+```
+
+Cada sesión conserva como máximo un turno DRR activo o en espera. Una VIEW nueva de
+la misma sesión puede diferirse mientras termina un turno anterior; esa condición no
+se presenta como saturación de la cola.
+
+### 17.6 Heartbeat y timeouts
+
+Defaults confirmados:
+
+```text
+HELLO timeout = 5 s
+PING interval = 15 s
+PONG timeout = 10 s
+delivery acknowledgement timeout = 30 s
+write-progress timeout = 10 s
+WebSocket close timeout = 2 s
+```
+
+El heartbeat utiliza PING/PONG RFC 6455, no mensajes JSON de aplicación.
+
+### 17.7 Reconexión
+
+Una reconexión es una sesión nueva:
+
+- vuelve a negociar HELLO/WELCOME;
+- no hereda créditos, época, plan, entregas ni timers;
+- `deliveryId` vuelve a comenzar en 1 en la nueva conexión;
+- el frontend usa `connectionId` local para ignorar callbacks de conexiones antiguas.
+
+### 17.8 Publicación y descubrimiento de imágenes
+
+El importador es una orden administrativa local Java que invoca libvips localmente.
+No existe subida HTTP del original.
+
+Estructura:
+
+```text
+data/originals/   privado
+data/staging/     privado/transitorio
+data/pyramids/    versiones publicadas e inmutables
+data/catalog.json catálogo vigente
+```
+
+Una importación válida:
+
+1. inspecciona el original;
+2. genera y valida la pirámide;
+3. conserva el original según la política configurada;
+4. publica una versión inmutable;
+5. reemplaza el catálogo de forma atómica.
+
+`/api/catalog` lee el catálogo publicado actual en cada petición y responde
+`Cache-Control: no-store`. Por ello una publicación nueva puede descubrirse sin
+reiniciar Java mediante **Recargar catálogo** en el visor.
+
+I22 verificó con el mismo proceso Java la publicación offline de
+`i22-offline-real/v1`, su aparición en `/api/catalog` y su visualización mediante
+LUPA. También verificó que una importación inválida termina con error sin modificar
+el SHA-256 del catálogo válido.
+
+### 17.9 Ejecución offline
+
+La ejecución de producción no requiere Vite ni acceso externo:
+
+- HTML, CSS, JavaScript y Worker son servidos por Java;
+- catálogo por `/api/catalog`;
+- protocolo de imagen por `/lupa`;
+- herramientas de importación: Java + libvips local.
+
+I22 comprobó construcción frontend con dependencias ya instaladas, Maven
+`-o clean verify package`, carga desde una ventana nueva y navegación con Internet
+externo interrumpido.
+
+Esto no equivale a una instalación desde cero en un equipo nuevo: la prueba offline
+usa caché Maven existente y `frontend/node_modules` ya preparado. Esa
+reproducibilidad completa pertenece al cierre final del proyecto.
