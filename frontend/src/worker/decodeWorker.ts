@@ -11,12 +11,14 @@ const minimumEpoch = new Map<number, number>();
 let active = 0;
 let queuedBytes = 0;
 let postDecodeDelayMs = 0;
+let failFirstDecodeOnce = false;
 
 self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   const message = event.data;
 
   if (message.type === 'configureDiagnostic') {
     postDecodeDelayMs = Math.max(0, Math.min(2000, Math.round(message.postDecodeDelayMs)));
+    failFirstDecodeOnce = message.failFirstDecodeOnce;
     return;
   }
 
@@ -98,6 +100,12 @@ async function decode(job: WorkerDecodeJob): Promise<void> {
   }
 
   try {
+    if (failFirstDecodeOnce && job.header.retry === undefined) {
+      failFirstDecodeOnce = false;
+      postFailure(job, 'STA diagnostic: synthetic first decode failure');
+      return;
+    }
+
     const bytes = new Uint8Array(job.buffer, job.payloadOffset, job.payloadBytes);
     const blob = new Blob([bytes], { type: 'image/jpeg' });
     const bitmap = await createImageBitmap(blob);

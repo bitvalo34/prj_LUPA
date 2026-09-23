@@ -151,15 +151,19 @@ export class LupaClient {
     this.worker.addEventListener('error', () => this.fail('El Worker de decodificación falló'));
 
     const diagnosticDelayMs = readI21DecodeDelayMs();
-    if (diagnosticDelayMs > 0) {
+    const staFailFirstDecode = readStaFailFirstDecode();
+    if (diagnosticDelayMs > 0 || staFailFirstDecode) {
       this.worker.postMessage({
         type: 'configureDiagnostic',
-        postDecodeDelayMs: diagnosticDelayMs
+        postDecodeDelayMs: diagnosticDelayMs,
+        failFirstDecodeOnce: staFailFirstDecode
       });
       this.trace.push(
         'LOCAL',
-        'I21_DIAG',
-        'postDecodeDelayMs=' + diagnosticDelayMs + ' (solo diagnóstico local)'
+        'DIAGNOSTIC',
+        'postDecodeDelayMs=' + diagnosticDelayMs +
+          ' staFailFirstDecode=' + staFailFirstDecode +
+          ' (solo diagnóstico local)'
       );
     }
   }
@@ -546,7 +550,8 @@ export class LupaClient {
       'delivery=' + header.deliveryId + ' epoch=' + header.epoch +
         ' z=' + header.z + ' x=' + header.x + ' y=' + header.y +
         ' w=' + header.w + ' h=' + header.h +
-        ' jpeg=' + header.payloadBytes
+        ' jpeg=' + header.payloadBytes +
+        (header.retry === undefined ? '' : ' retry=' + header.retry)
     );
     if (!this.firstTileHashRecorded) {
       this.firstTileHashRecorded = true;
@@ -1093,6 +1098,12 @@ function readI21DecodeDelayMs(): number {
   return Math.max(0, Math.min(2000, Math.round(parsed)));
 }
 
+function readStaFailFirstDecode(): boolean {
+  if (typeof window === 'undefined') return false;
+  const raw = new URLSearchParams(window.location.search).get('staFailFirstDecode');
+  return raw === '1' || raw === 'true';
+}
+
 function summarizeControl(control: Record<string, unknown>): string {
   const keys = [
     'epoch', 'imageId', 'imageVersion', 'deliveryId', 'status',
@@ -1101,6 +1112,13 @@ function summarizeControl(control: Record<string, unknown>): string {
   const parts = keys
     .filter((key) => control[key] !== undefined)
     .map((key) => key + '=' + String(control[key]));
+
+  if (control.type === 'ACK_STATE') {
+    const received = Array.isArray(control.received) ? control.received : [];
+    const missing = Array.isArray(control.missing) ? control.missing : [];
+    parts.push('received=' + JSON.stringify(received));
+    parts.push('missing=' + JSON.stringify(missing));
+  }
 
   if (control.type === 'VIEW') {
     const rect = control.rect as Record<string, unknown> | undefined;

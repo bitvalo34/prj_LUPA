@@ -46,6 +46,27 @@ describe('parseTileEnvelope', () => {
     expect(result.payloadBytes).toBe(4);
   });
 
+  it('acepta metadata de retransmisión selectiva en TILE', () => {
+    const buffer = envelope({
+      type: 'TILE',
+      deliveryId: 9,
+      epoch: 2,
+      imageId: 'sample-world',
+      imageVersion: 'v1',
+      z: 0,
+      x: 0,
+      y: 0,
+      w: 128,
+      h: 96,
+      codec: 'jpeg',
+      payloadBytes: 4,
+      retry: 1
+    });
+    const result = parseTileEnvelope(buffer, manifest);
+    expect(result.header.deliveryId).toBe(9);
+    expect(result.header.retry).toBe(1);
+  });
+
   it('rechaza longitud H y payload inconsistente', () => {
     const badH = new ArrayBuffer(8);
     new DataView(badH).setUint32(0, 5000, false);

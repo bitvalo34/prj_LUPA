@@ -158,6 +158,7 @@ export function parseTileHeader(value: unknown): TileHeader {
   const imageId = requireString(value, 'imageId', 64);
   const imageVersion = requireString(value, 'imageVersion', 11);
   if (!IMAGE_ID.test(imageId) || !IMAGE_VERSION.test(imageVersion)) throw new Error('Identidad TILE inválida');
+  const retry = value.retry === undefined ? undefined : requireInt(value, 'retry', 1, 2);
   return {
     type: 'TILE',
     deliveryId: requireInt(value, 'deliveryId', 1),
@@ -170,7 +171,8 @@ export function parseTileHeader(value: unknown): TileHeader {
     w: requireInt(value, 'w', 1, 256),
     h: requireInt(value, 'h', 1, 256),
     codec: 'jpeg',
-    payloadBytes: requireInt(value, 'payloadBytes', 1, 262_144)
+    payloadBytes: requireInt(value, 'payloadBytes', 1, 262_144),
+    ...(retry === undefined ? {} : { retry })
   };
 }
 

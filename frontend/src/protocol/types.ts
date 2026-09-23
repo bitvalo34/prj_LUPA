@@ -94,6 +94,7 @@ export interface TileHeader {
   h: number;
   codec: 'jpeg';
   payloadBytes: number;
+  retry?: number;
 }
 
 export interface ParsedTile {
@@ -148,6 +149,7 @@ export interface WorkerReset {
 export interface WorkerDiagnosticConfig {
   type: 'configureDiagnostic';
   postDecodeDelayMs: number;
+  failFirstDecodeOnce: boolean;
 }
 
 export type WorkerRequest =
