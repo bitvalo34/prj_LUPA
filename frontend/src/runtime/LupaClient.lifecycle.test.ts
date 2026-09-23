@@ -250,9 +250,83 @@ describe('ciclo de vida A22', () => {
       reason: 'invalidated by OPEN'
     });
 
+    expect(transport.sent.at(-1)).toEqual({
+      type: 'ACK_STATE',
+      epoch: 1,
+      received: [[1, 1]],
+      missing: []
+    });
+
     expect(client.snapshot().pendingDecodes).toBe(0);
     expect(client.snapshot().phase).toBe('ready');
     expect(client.snapshot().error).toContain('termine la importación');
+    client.destroy();
+  });
+
+  it('solicita recuperación selectiva y acepta el mismo deliveryId solo como retransmisión esperada', () => {
+    const transport = new FakeTransport();
+    const { client, worker } = createClient([transport]);
+
+    client.connect();
+    transport.open();
+    welcome(transport);
+    client.setViewport(800, 600, 1);
+    client.selectImage(FIRST);
+    manifest(transport, FIRST, 1);
+
+    transport.receive({
+      type: 'PLAN', epoch: 2, appliedLevel: 0, contextLevel: 0
+    });
+    transport.receiveBinary(tile(FIRST, 2, 7));
+
+    const firstDecode = worker.posted.find(
+      (message): message is { type: 'decode'; jobId: string } =>
+        typeof message === 'object' && message !== null &&
+        (message as { type?: string }).type === 'decode' &&
+        (message as { jobId?: string }).jobId === '1:7'
+    );
+    expect(firstDecode).toBeDefined();
+
+    worker.emit({
+      type: 'failed',
+      jobId: '1:7',
+      connectionId: 1,
+      epoch: 2,
+      deliveryId: 7,
+      reason: 'synthetic decode failure'
+    });
+
+    expect(transport.sent.at(-1)).toEqual({
+      type: 'ACK_STATE',
+      epoch: 2,
+      received: [],
+      missing: [7]
+    });
+
+    transport.receiveBinary(tile(FIRST, 2, 7));
+
+    worker.emit({
+      type: 'discarded',
+      jobId: '1:7',
+      connectionId: 1,
+      epoch: 2,
+      deliveryId: 7,
+      reason: 'test terminal acknowledgement'
+    });
+
+    expect(transport.sent.at(-1)).toEqual({
+      type: 'ACK_STATE',
+      epoch: 2,
+      received: [[7, 7]],
+      missing: []
+    });
+
+    expect(
+      client.snapshot().trace.some(
+        (entry) => entry.event === 'RETRANSMIT_ACCEPTED'
+      )
+    ).toBe(true);
+
     client.destroy();
   });
 

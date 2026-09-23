@@ -1,0 +1,132 @@
+I21_DIAG session=1 event=OPEN_SOCKET state=ESPERA_HELLO
+I21_DIAG session=1 event=CLOSE epoch=0 free=1048576 reserved=0 pending=0 window=1048576 invariant=OK code=1001 reason=LUPA request rejected
+I21_DIAG session=2 event=OPEN_SOCKET state=ESPERA_HELLO
+I21_DIAG session=3 event=OPEN_SOCKET state=ESPERA_HELLO
+I21_DIAG session=3 event=OPEN epoch=1 free=1048576 reserved=0 pending=0 window=1048576 invariant=OK epoch=1 image=demo-auxiliar/v1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=1
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=4133 quantum=8192 selectionVisits=0 chargedTotal=4133 waiting=0 inFlight=0
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=2
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=14666 quantum=8192 selectionVisits=0 chargedTotal=18799 waiting=0 inFlight=0
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=3
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=9168 quantum=8192 selectionVisits=0 chargedTotal=27967 waiting=0 inFlight=0
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=4
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=10910 quantum=8192 selectionVisits=0 chargedTotal=38877 waiting=0 inFlight=0
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=5
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=OPEN epoch=1 free=1048576 reserved=0 pending=0 window=1048576 invariant=OK epoch=1 image=demo-auxiliar/v1
+I21_DIAG session=3 event=DRR_CHARGE bytes=2683 quantum=8192 selectionVisits=1 chargedTotal=41560 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=1
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=4133 quantum=8192 selectionVisits=1 chargedTotal=45693 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=6
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=929 quantum=8192 selectionVisits=1 chargedTotal=46622 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=2
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=14666 quantum=8192 selectionVisits=1 chargedTotal=61288 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=7
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=19141 quantum=8192 selectionVisits=3 chargedTotal=80429 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=3
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=9168 quantum=8192 selectionVisits=3 chargedTotal=89597 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=8
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=3013 quantum=8192 selectionVisits=1 chargedTotal=92610 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=4
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=10910 quantum=8192 selectionVisits=1 chargedTotal=103520 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=9
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=19024 quantum=8192 selectionVisits=1 chargedTotal=122544 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=5
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=2683 quantum=8192 selectionVisits=2 chargedTotal=125227 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=10
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=4620 quantum=8192 selectionVisits=1 chargedTotal=129847 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=6
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=11
+I21_DIAG session=2 event=DRR_CHARGE bytes=929 quantum=8192 selectionVisits=1 chargedTotal=130776 waiting=0 inFlight=1
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=929 quantum=8192 selectionVisits=1 chargedTotal=131705 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=7
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=19141 quantum=8192 selectionVisits=1 chargedTotal=150846 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=12
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=20165 quantum=8192 selectionVisits=1 chargedTotal=171011 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=8
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=3013 quantum=8192 selectionVisits=1 chargedTotal=174024 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=13
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=4295 quantum=8192 selectionVisits=1 chargedTotal=178319 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=9
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=19024 quantum=8192 selectionVisits=1 chargedTotal=197343 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=14
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=24104 quantum=8192 selectionVisits=2 chargedTotal=221447 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=10
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=4620 quantum=8192 selectionVisits=3 chargedTotal=226067 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=15
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=11913 quantum=8192 selectionVisits=1 chargedTotal=237980 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=11
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=929 quantum=8192 selectionVisits=1 chargedTotal=238909 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=16
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=1465 quantum=8192 selectionVisits=1 chargedTotal=240374 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=12
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=20165 quantum=8192 selectionVisits=1 chargedTotal=260539 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=17
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=3271 quantum=8192 selectionVisits=1 chargedTotal=263810 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=13
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=4295 quantum=8192 selectionVisits=1 chargedTotal=268105 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=18
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=14
+I21_DIAG session=3 event=DRR_CHARGE bytes=2111 quantum=8192 selectionVisits=1 chargedTotal=270216 waiting=0 inFlight=1
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=24104 quantum=8192 selectionVisits=1 chargedTotal=294320 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=19
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=801 quantum=8192 selectionVisits=3 chargedTotal=295121 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=15
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=11913 quantum=8192 selectionVisits=1 chargedTotal=307034 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=20
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=801 quantum=8192 selectionVisits=1 chargedTotal=307835 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=16
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=1465 quantum=8192 selectionVisits=1 chargedTotal=309300 waiting=0 inFlight=1
+I21_DIAG session=3 event=TURN generation=3 epoch=2 turn=21
+I21_DIAG session=3 event=DRR_READ_DELAY ms=100
+I21_DIAG session=3 event=DRR_CHARGE bytes=669 quantum=8192 selectionVisits=1 chargedTotal=309969 waiting=0 inFlight=1
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=17
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=3271 quantum=8192 selectionVisits=0 chargedTotal=313240 waiting=0 inFlight=0
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=18
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=2111 quantum=8192 selectionVisits=0 chargedTotal=315351 waiting=0 inFlight=0
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=19
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=801 quantum=8192 selectionVisits=0 chargedTotal=316152 waiting=0 inFlight=0
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=20
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=801 quantum=8192 selectionVisits=0 chargedTotal=316953 waiting=0 inFlight=0
+I21_DIAG session=2 event=TURN generation=3 epoch=2 turn=21
+I21_DIAG session=2 event=DRR_READ_DELAY ms=100
+I21_DIAG session=2 event=DRR_CHARGE bytes=669 quantum=8192 selectionVisits=0 chargedTotal=317622 waiting=0 inFlight=0

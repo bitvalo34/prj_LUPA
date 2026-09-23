@@ -21,6 +21,36 @@ describe('DeliveryLedger', () => {
     expect(ledger.releaseOnce(4, 9, 'discarded', sender)).toBe(false);
     expect(sender).not.toHaveBeenCalled();
   });
+
+
+  it('permite exactamente la retransmisión que fue solicitada selectivamente', () => {
+    const ledger = new DeliveryLedger();
+    const retrySender = vi.fn();
+
+    expect(ledger.register(9, 2)).toBe(true);
+    expect(ledger.requestRetry(9, 2, retrySender)).toBe(true);
+    expect(retrySender).toHaveBeenCalledWith(9);
+
+    expect(ledger.register(9, 2)).toBe(false);
+    expect(ledger.acceptRetransmission(9, 2)).toBe(true);
+    expect(ledger.acceptRetransmission(9, 2)).toBe(false);
+  });
+
+  it('acota las solicitudes de recuperación selectiva por delivery', () => {
+    const ledger = new DeliveryLedger();
+    const retrySender = vi.fn();
+
+    expect(ledger.register(11, 5)).toBe(true);
+
+    expect(ledger.requestRetry(11, 5, retrySender)).toBe(true);
+    expect(ledger.acceptRetransmission(11, 5)).toBe(true);
+
+    expect(ledger.requestRetry(11, 5, retrySender)).toBe(true);
+    expect(ledger.acceptRetransmission(11, 5)).toBe(true);
+
+    expect(ledger.requestRetry(11, 5, retrySender)).toBe(false);
+    expect(retrySender).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('BitmapBudget', () => {

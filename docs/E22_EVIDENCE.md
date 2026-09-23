@@ -35,7 +35,7 @@ regresión antes de declarar cerrado E22.
 | Worker HTTP/estado | cola 256 | `ThreadPoolExecutor` | HTTP 503/rechazo | configuración + regresión |
 | Disco de teselas | 4 threads, cola 64 | `StorageExecutors` | rechazo, nunca CallerRuns | `StorageExecutorsTest` |
 | Metadata | 2 threads, cola 32 | `StorageExecutors` | rechazo | `StorageExecutorsTest` |
-| Turnos de lectura | 8 globales | `TileReadAdmission` | espera FIFO acotada/rechazo | `TileReadAdmissionTest`, `LupaSessionFairnessTest` |
+| Turnos de lectura | 8 globales, quantum 128 KiB | `TileReadAdmission` | DRR por costo JPEG + espera acotada/rechazo | `TileReadAdmissionTest`, `LupaSessionFairnessTest` |
 | Espera de turnos | máx. sesiones | `TileReadAdmission` | rechazo | pruebas de admisión |
 | Caché JPEG | 128 MiB residentes | `CompressedTileCache` | LRU | `CompressedTileCacheTest` |
 | JPEG desalojado aún retenido | contador separado | handles de caché | se libera al último close | `CompressedTileCacheTest` |
@@ -124,7 +124,7 @@ no cierra ejecutores globales al terminar una sola sesión.
 | caché JPEG 128 MiB | LRU + tests de bytes/versiones/concurrencia | Implementado y probado |
 | buffers fuera de caché acotados | `TransientBufferBudget` | Implementado y probado |
 | disco fuera de callbacks de red | ejecutores bounded separados | Implementado y probado |
-| turnos entre sesiones | secuencia A-B-A determinista | Implementado y probado |
+| turnos entre sesiones | A-B-A con costos iguales + A-B-C-B-A con costos variables DRR | Implementado; pendiente de ejecutar regresión nueva |
 | cliente sin RELEASE aislado | cliente bloqueado por créditos + otro DONE | Implementado y probado |
 | cliente que no lee aislado | sockets WebSocket reales | Verificado en equipo |
 | heartbeat/timeouts separados | scheduler monotónico + tests | Implementado y probado |

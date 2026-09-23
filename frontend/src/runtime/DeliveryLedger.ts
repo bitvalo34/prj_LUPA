@@ -2,9 +2,12 @@ import type { ReleaseStatus } from '../protocol/types';
 
 interface DeliveryState {
   connectionId: number;
+  retryExpected: boolean;
+  retryRequests: number;
 }
 
 const MAX_RELEASED_HISTORY = 2048;
+const MAX_SELECTIVE_RETRIES = 2;
 
 export class DeliveryLedger {
   private readonly active = new Map<number, DeliveryState>();
@@ -12,7 +15,39 @@ export class DeliveryLedger {
 
   register(deliveryId: number, connectionId: number): boolean {
     if (this.active.has(deliveryId) || this.released.has(deliveryId)) return false;
-    this.active.set(deliveryId, { connectionId });
+    this.active.set(deliveryId, {
+      connectionId,
+      retryExpected: false,
+      retryRequests: 0
+    });
+    return true;
+  }
+
+  acceptRetransmission(deliveryId: number, connectionId: number): boolean {
+    const delivery = this.active.get(deliveryId);
+    if (!delivery || delivery.connectionId !== connectionId || !delivery.retryExpected) return false;
+    delivery.retryExpected = false;
+    return true;
+  }
+
+  requestRetry(
+    deliveryId: number,
+    connectionId: number,
+    sender: (deliveryId: number) => void
+  ): boolean {
+    const delivery = this.active.get(deliveryId);
+    if (
+      !delivery ||
+      delivery.connectionId !== connectionId ||
+      delivery.retryExpected ||
+      delivery.retryRequests >= MAX_SELECTIVE_RETRIES
+    ) {
+      return false;
+    }
+
+    delivery.retryExpected = true;
+    delivery.retryRequests++;
+    sender(deliveryId);
     return true;
   }
 

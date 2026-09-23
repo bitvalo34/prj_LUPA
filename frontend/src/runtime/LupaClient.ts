@@ -151,15 +151,19 @@ export class LupaClient {
     this.worker.addEventListener('error', () => this.fail('El Worker de decodificación falló'));
 
     const diagnosticDelayMs = readI21DecodeDelayMs();
-    if (diagnosticDelayMs > 0) {
+    const staFailFirstDecode = readStaFailFirstDecode();
+    if (diagnosticDelayMs > 0 || staFailFirstDecode) {
       this.worker.postMessage({
         type: 'configureDiagnostic',
-        postDecodeDelayMs: diagnosticDelayMs
+        postDecodeDelayMs: diagnosticDelayMs,
+        failFirstDecodeOnce: staFailFirstDecode
       });
       this.trace.push(
         'LOCAL',
-        'I21_DIAG',
-        'postDecodeDelayMs=' + diagnosticDelayMs + ' (solo diagnóstico local)'
+        'DIAGNOSTIC',
+        'postDecodeDelayMs=' + diagnosticDelayMs +
+          ' staFailFirstDecode=' + staFailFirstDecode +
+          ' (solo diagnóstico local)'
       );
     }
   }
@@ -546,7 +550,8 @@ export class LupaClient {
       'delivery=' + header.deliveryId + ' epoch=' + header.epoch +
         ' z=' + header.z + ' x=' + header.x + ' y=' + header.y +
         ' w=' + header.w + ' h=' + header.h +
-        ' jpeg=' + header.payloadBytes
+        ' jpeg=' + header.payloadBytes +
+        (header.retry === undefined ? '' : ' retry=' + header.retry)
     );
     if (!this.firstTileHashRecorded) {
       this.firstTileHashRecorded = true;
@@ -562,8 +567,15 @@ export class LupaClient {
     }
 
     if (!this.ledger.register(header.deliveryId, connectionId)) {
-      this.protocolViolation(new Error('deliveryId duplicado'));
-      return;
+      if (!this.ledger.acceptRetransmission(header.deliveryId, connectionId)) {
+        this.protocolViolation(new Error('deliveryId duplicado sin recuperación solicitada'));
+        return;
+      }
+      this.trace.push(
+        'LOCAL',
+        'RETRANSMIT_ACCEPTED',
+        'delivery=' + header.deliveryId + ' epoch=' + header.epoch
+      );
     }
 
     if (header.epoch < this.epoch) {
@@ -576,7 +588,7 @@ export class LupaClient {
           ' currentEpoch=' + this.epoch +
           ' discarded antes del Worker'
       );
-      this.release(header.deliveryId, connectionId, 'discarded');
+      this.release(header.deliveryId, connectionId, header.epoch, 'discarded');
       this.notifySoon();
       return;
     }
@@ -590,7 +602,7 @@ export class LupaClient {
     if (!this.budget.reserve(jobId, decodedBytes)) {
       this.discardedTiles++;
       this.trace.push('LOCAL', 'BUDGET_DROP', 'delivery=' + header.deliveryId + ' rgba=' + decodedBytes);
-      this.release(header.deliveryId, connectionId, 'discarded');
+      this.release(header.deliveryId, connectionId, header.epoch, 'discarded');
       this.notifySoon();
       return;
     }
@@ -639,14 +651,14 @@ export class LupaClient {
         this.budget.cancel(response.jobId);
         this.discardedTiles++;
         if (response.connectionId === this.connectionId) {
-          this.release(response.deliveryId, response.connectionId, 'discarded');
+          this.release(response.deliveryId, response.connectionId, response.epoch, 'discarded');
         }
       } else {
         const bytes = this.budget.commit(response.jobId, pending.kind);
         if (bytes === null || !this.compositor) {
           response.bitmap.close();
           this.discardedTiles++;
-          this.release(response.deliveryId, response.connectionId, 'discarded');
+          this.release(response.deliveryId, response.connectionId, response.epoch, 'discarded');
         } else {
           this.pendingPresentations++;
           const accepted = this.compositor.store(
@@ -657,14 +669,14 @@ export class LupaClient {
             () => {
               this.pendingPresentations = Math.max(0, this.pendingPresentations - 1);
               this.drawnTiles++;
-              this.release(response.deliveryId, response.connectionId, 'displayed');
+              this.release(response.deliveryId, response.connectionId, response.epoch, 'displayed');
               this.updateCompletionPhase();
               this.notifySoon();
             },
             () => {
               this.pendingPresentations = Math.max(0, this.pendingPresentations - 1);
               this.discardedTiles++;
-              this.release(response.deliveryId, response.connectionId, 'discarded');
+              this.release(response.deliveryId, response.connectionId, response.epoch, 'discarded');
               this.updateCompletionPhase();
               this.notifySoon();
             }
@@ -673,7 +685,7 @@ export class LupaClient {
             this.pendingPresentations = Math.max(0, this.pendingPresentations - 1);
             this.budget.removeStored(pending.kind, bytes);
             this.discardedTiles++;
-            this.release(response.deliveryId, response.connectionId, 'discarded');
+            this.release(response.deliveryId, response.connectionId, response.epoch, 'discarded');
           }
         }
       }
@@ -682,10 +694,16 @@ export class LupaClient {
       if (response.connectionId === this.connectionId) {
         if (response.type === 'discarded') {
           this.discardedTiles++;
-          this.release(response.deliveryId, response.connectionId, 'discarded');
+          this.release(response.deliveryId, response.connectionId, response.epoch, 'discarded');
         } else {
           this.failedTiles++;
-          this.release(response.deliveryId, response.connectionId, 'failed');
+          if (!this.requestSelectiveRetry(
+            response.deliveryId,
+            response.connectionId,
+            response.epoch
+          )) {
+            this.release(response.deliveryId, response.connectionId, response.epoch, 'failed');
+          }
         }
       }
       this.trace.push(
@@ -978,12 +996,69 @@ export class LupaClient {
     }
   }
 
-  private release(deliveryId: number, connectionId: number, status: ReleaseStatus): void {
+  private release(
+    deliveryId: number,
+    connectionId: number,
+    epoch: number,
+    status: ReleaseStatus
+  ): void {
     if (connectionId !== this.connectionId || !this.transport?.isOpen) return;
-    const sent = this.ledger.releaseOnce(deliveryId, connectionId, status, (id, releaseStatus) => {
-      this.send({ type: 'RELEASE', deliveryId: id, status: releaseStatus });
+
+    const sent = this.ledger.releaseOnce(deliveryId, connectionId, status, (id) => {
+      /*
+       * ACK_STATE is the LUPA selective acknowledgement primitive. A single
+       * terminal delivery is represented as a one-element inclusive range;
+       * the wire format also allows callers/tools to batch adjacent ids.
+       *
+       * RELEASE remains accepted by the server for v1 compatibility, but the
+       * browser now exercises the selective acknowledgement path.
+       */
+      this.send({
+        type: 'ACK_STATE',
+        epoch,
+        received: [[id, id]],
+        missing: []
+      });
     });
+
     if (sent) this.releases++;
+  }
+
+  private requestSelectiveRetry(
+    deliveryId: number,
+    connectionId: number,
+    epoch: number
+  ): boolean {
+    if (
+      connectionId !== this.connectionId ||
+      epoch !== this.epoch ||
+      !this.transport?.isOpen
+    ) {
+      return false;
+    }
+
+    const requested = this.ledger.requestRetry(
+      deliveryId,
+      connectionId,
+      (id) => {
+        this.send({
+          type: 'ACK_STATE',
+          epoch,
+          received: [],
+          missing: [id]
+        });
+      }
+    );
+
+    if (requested) {
+      this.trace.push(
+        'OUT',
+        'SELECTIVE_RECOVERY',
+        'delivery=' + deliveryId + ' epoch=' + epoch
+      );
+    }
+
+    return requested;
   }
 
   private protocolViolation(error: unknown): void {
@@ -1023,6 +1098,12 @@ function readI21DecodeDelayMs(): number {
   return Math.max(0, Math.min(2000, Math.round(parsed)));
 }
 
+function readStaFailFirstDecode(): boolean {
+  if (typeof window === 'undefined') return false;
+  const raw = new URLSearchParams(window.location.search).get('staFailFirstDecode');
+  return raw === '1' || raw === 'true';
+}
+
 function summarizeControl(control: Record<string, unknown>): string {
   const keys = [
     'epoch', 'imageId', 'imageVersion', 'deliveryId', 'status',
@@ -1031,6 +1112,13 @@ function summarizeControl(control: Record<string, unknown>): string {
   const parts = keys
     .filter((key) => control[key] !== undefined)
     .map((key) => key + '=' + String(control[key]));
+
+  if (control.type === 'ACK_STATE') {
+    const received = Array.isArray(control.received) ? control.received : [];
+    const missing = Array.isArray(control.missing) ? control.missing : [];
+    parts.push('received=' + JSON.stringify(received));
+    parts.push('missing=' + JSON.stringify(missing));
+  }
 
   if (control.type === 'VIEW') {
     const rect = control.rect as Record<string, unknown> | undefined;
