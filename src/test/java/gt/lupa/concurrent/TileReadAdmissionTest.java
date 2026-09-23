@@ -41,6 +41,9 @@ class TileReadAdmissionTest {
         TileReadAdmission.AcquireResult rejected =
                 admission.acquireOrQueue(lease -> {});
         assertFalse(rejected.accepted());
+        assertEquals(
+                TileReadAdmission.RejectReason.QUEUE_FULL,
+                rejected.rejectReason());
 
         first.lease().close();
 
@@ -82,6 +85,9 @@ class TileReadAdmissionTest {
                         101L,
                         lease -> fail("duplicate A must not queue"));
         assertFalse(duplicateA.accepted());
+        assertEquals(
+                TileReadAdmission.RejectReason.DUPLICATE_OWNER,
+                duplicateA.rejectReason());
 
         TileReadAdmission.AcquireResult b =
                 admission.acquireOrQueue(

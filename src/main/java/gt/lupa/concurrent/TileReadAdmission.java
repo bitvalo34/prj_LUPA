@@ -95,7 +95,8 @@ public final class TileReadAdmission {
         if (outstandingOwners.contains(ownerId)) {
             duplicateOwnerRejections++;
             rejected++;
-            return AcquireResult.rejected();
+            return AcquireResult.rejected(
+                    RejectReason.DUPLICATE_OWNER);
         }
 
         FlowState flow =
@@ -123,7 +124,8 @@ public final class TileReadAdmission {
 
         if (waiters.size() >= maxWaiters) {
             rejected++;
-            return AcquireResult.rejected();
+            return AcquireResult.rejected(
+                    RejectReason.QUEUE_FULL);
         }
 
         outstandingOwners.add(ownerId);
@@ -326,15 +328,22 @@ public final class TileReadAdmission {
             long chargedBytes,
             long drrVisits) {}
 
+    public enum RejectReason {
+        DUPLICATE_OWNER,
+        QUEUE_FULL
+    }
+
     public record AcquireResult(
             boolean accepted,
             Lease lease,
-            WaitHandle waitHandle) {
+            WaitHandle waitHandle,
+            RejectReason rejectReason) {
         private static AcquireResult granted(
                 Lease lease) {
             return new AcquireResult(
                     true,
                     lease,
+                    null,
                     null);
         }
 
@@ -343,14 +352,17 @@ public final class TileReadAdmission {
             return new AcquireResult(
                     true,
                     null,
-                    waitHandle);
+                    waitHandle,
+                    null);
         }
 
-        private static AcquireResult rejected() {
+        private static AcquireResult rejected(
+                RejectReason reason) {
             return new AcquireResult(
                     false,
                     null,
-                    null);
+                    null,
+                    Objects.requireNonNull(reason));
         }
 
         public boolean grantedImmediately() {

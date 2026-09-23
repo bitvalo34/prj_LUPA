@@ -1143,6 +1143,25 @@ public final class LupaSession implements WebSocketEndpoint {
                         lease -> onReadPermitGrantedAsync(plan.generation, lease));
 
         if (!admission.accepted()) {
+            if (admission.rejectReason()
+                    == TileReadAdmission.RejectReason.DUPLICATE_OWNER) {
+                /*
+                 * A previous VIEW from this session may still own the DRR turn
+                 * while a newer VIEW has already replaced its plan. This is a
+                 * transient navigation condition, not queue saturation.
+                 *
+                 * The stale permit/read completion wakes pump() after releasing
+                 * the old lease, so the latest VIEW resumes without surfacing
+                 * INTERNAL_READ_ERROR to the browser.
+                 */
+                diagnostic(
+                        "DRR_DEFER",
+                        "generation=" + plan.generation
+                                + " epoch=" + plan.view.epoch()
+                                + " reason=previous session turn outstanding");
+                return;
+            }
+
             failPlan(
                     plan,
                     LupaProtocol.ErrorCode.INTERNAL_READ_ERROR,
@@ -1185,6 +1204,7 @@ public final class LupaSession implements WebSocketEndpoint {
         if (closed.get() || plan == null || plan.generation != generation) {
             metrics.recordLateCallbackDiscarded();
             lease.close();
+            pump();
             return;
         }
 
@@ -1313,6 +1333,7 @@ public final class LupaSession implements WebSocketEndpoint {
         if (plan == null || plan.generation != generation) {
             metrics.recordLateCallbackDiscarded();
             if (tile != null) tile.close();
+            pump();
             return;
         }
 
