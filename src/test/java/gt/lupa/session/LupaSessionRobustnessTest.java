@@ -110,8 +110,19 @@ class LupaSessionRobustnessTest {
         assertEquals(1, disk.size());
 
         session.onClosed(1006, "abrupt");
+        LupaSession.SessionSnapshot closed = session.snapshotForTest();
+        assertEquals(LupaSessionState.CERRADA, closed.state());
+        assertEquals(0, closed.pendingDeliveries());
+        assertEquals(0, closed.reservedBytes());
+        assertEquals(0, closed.freeWindowBytes());
+
         disk.runAll();
 
+        LupaSession.SessionSnapshot afterLateRead = session.snapshotForTest();
+        assertEquals(LupaSessionState.CERRADA, afterLateRead.state());
+        assertEquals(0, afterLateRead.pendingDeliveries());
+        assertEquals(0, afterLateRead.reservedBytes());
+        assertEquals(0, afterLateRead.freeWindowBytes());
         assertTrue(sender.binaries.isEmpty(), "late disk result must not be emitted after disconnect");
         assertFalse(sender.hasType("DONE"));
     }
