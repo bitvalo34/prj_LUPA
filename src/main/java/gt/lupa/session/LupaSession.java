@@ -1239,8 +1239,29 @@ public final class LupaSession implements WebSocketEndpoint {
                             e);
                 } finally {
                     if (readLease != null) {
+                        long visitsBefore =
+                                tileReadAdmission == null
+                                        ? 0
+                                        : tileReadAdmission.snapshot().drrVisits();
+
                         readLease.complete(
                                 actualCompressedBytes);
+
+                        if (tileReadAdmission != null) {
+                            TileReadAdmission.Snapshot drr =
+                                    tileReadAdmission.snapshot();
+
+                            diagnostic(
+                                    "DRR_CHARGE",
+                                    "bytes=" + actualCompressedBytes
+                                            + " quantum=" + drr.quantumBytes()
+                                            + " selectionVisits="
+                                            + (drr.drrVisits() - visitsBefore)
+                                            + " chargedTotal="
+                                            + drr.chargedBytes()
+                                            + " waiting=" + drr.waiting()
+                                            + " inFlight=" + drr.inFlight());
+                        }
                     }
                 }
 

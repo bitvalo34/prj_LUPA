@@ -1,0 +1,65 @@
+# LUPA A22 trace
+# generatedAt=2026-09-23T16:59:13.186Z
+# connection=1 image=demo-auxiliar version=v1 epoch=2
+# tiles received=22 terminal=22 drawn=21 discarded=0 failed=1 releases=21 doneSent=21
+# pending decode=0 paint=0 managedBitmapBytes=3628856
+# phase=observing error=-
+2026-09-23T16:58:41.504Z	LOCAL	DIAGNOSTIC	postDecodeDelayMs=0 staFailFirstDecode=true (solo diagnóstico local)
+2026-09-23T16:58:41.514Z	LOCAL	CONNECT	conexión local #1
+2026-09-23T16:58:41.567Z	LOCAL	WS_OPEN	lupa.v1
+2026-09-23T16:58:41.567Z	OUT	HELLO	
+2026-09-23T16:58:41.571Z	IN	WELCOME	
+2026-09-23T16:58:59.994Z	OUT	OPEN	epoch=1 imageId=demo-auxiliar
+2026-09-23T16:59:00.006Z	IN	MANIFEST	epoch=1 imageId=demo-auxiliar imageVersion=v1
+2026-09-23T16:59:00.028Z	OUT	VIEW	epoch=2 imageId=demo-auxiliar imageVersion=v1 detailOffset=0 mode=uniform rect=0,0,1096,815 viewport=796x592
+2026-09-23T16:59:00.033Z	IN	PLAN	epoch=2 appliedLevel=3 contextLevel=3
+2026-09-23T16:59:00.035Z	IN	TILE	delivery=1 epoch=2 z=0 x=0 y=0 w=137 h=102 jpeg=4133
+2026-09-23T16:59:00.035Z	LOCAL	TILE_SHA256	delivery=1 z=0 x=0 y=0 bytes=4133 sha256=1db9f08ef488717d0b2d441d532e018f96e19250bb798c4359344b1e85db6736
+2026-09-23T16:59:00.036Z	OUT	ACK_STATE	epoch=2 received=[] missing=[1]
+2026-09-23T16:59:00.036Z	OUT	SELECTIVE_RECOVERY	delivery=1 epoch=2
+2026-09-23T16:59:00.036Z	LOCAL	FAILED	delivery=1 epoch=2 connection=1 reason=STA diagnostic: synthetic first decode failure
+2026-09-23T16:59:00.040Z	IN	TILE	delivery=2 epoch=2 z=3 x=0 y=0 w=256 h=256 jpeg=14666
+2026-09-23T16:59:00.040Z	IN	TILE	delivery=1 epoch=2 z=0 x=0 y=0 w=137 h=102 jpeg=4133 retry=1
+2026-09-23T16:59:00.040Z	LOCAL	RETRANSMIT_ACCEPTED	delivery=1 epoch=2
+2026-09-23T16:59:00.040Z	IN	TILE	delivery=3 epoch=2 z=3 x=1 y=0 w=256 h=256 jpeg=9168
+2026-09-23T16:59:00.042Z	IN	TILE	delivery=4 epoch=2 z=3 x=2 y=0 w=256 h=256 jpeg=10910
+2026-09-23T16:59:00.043Z	IN	TILE	delivery=5 epoch=2 z=3 x=3 y=0 w=256 h=256 jpeg=2683
+2026-09-23T16:59:00.045Z	IN	TILE	delivery=6 epoch=2 z=3 x=4 y=0 w=72 h=256 jpeg=929
+2026-09-23T16:59:00.048Z	IN	TILE	delivery=7 epoch=2 z=3 x=0 y=1 w=256 h=256 jpeg=19141
+2026-09-23T16:59:00.050Z	IN	TILE	delivery=8 epoch=2 z=3 x=1 y=1 w=256 h=256 jpeg=3013
+2026-09-23T16:59:00.055Z	IN	TILE	delivery=9 epoch=2 z=3 x=2 y=1 w=256 h=256 jpeg=19024
+2026-09-23T16:59:00.055Z	IN	TILE	delivery=10 epoch=2 z=3 x=3 y=1 w=256 h=256 jpeg=4620
+2026-09-23T16:59:00.056Z	OUT	ACK_STATE	epoch=2 received=[[1,1]] missing=[]
+2026-09-23T16:59:00.056Z	OUT	ACK_STATE	epoch=2 received=[[2,2]] missing=[]
+2026-09-23T16:59:00.056Z	OUT	ACK_STATE	epoch=2 received=[[3,3]] missing=[]
+2026-09-23T16:59:00.056Z	OUT	ACK_STATE	epoch=2 received=[[4,4]] missing=[]
+2026-09-23T16:59:00.056Z	OUT	ACK_STATE	epoch=2 received=[[5,5]] missing=[]
+2026-09-23T16:59:00.056Z	OUT	ACK_STATE	epoch=2 received=[[6,6]] missing=[]
+2026-09-23T16:59:00.056Z	OUT	ACK_STATE	epoch=2 received=[[7,7]] missing=[]
+2026-09-23T16:59:00.056Z	OUT	ACK_STATE	epoch=2 received=[[8,8]] missing=[]
+2026-09-23T16:59:00.064Z	IN	TILE	delivery=11 epoch=2 z=3 x=4 y=1 w=72 h=256 jpeg=929
+2026-09-23T16:59:00.064Z	IN	TILE	delivery=12 epoch=2 z=3 x=0 y=2 w=256 h=256 jpeg=20165
+2026-09-23T16:59:00.064Z	IN	TILE	delivery=13 epoch=2 z=3 x=1 y=2 w=256 h=256 jpeg=4295
+2026-09-23T16:59:00.065Z	IN	TILE	delivery=14 epoch=2 z=3 x=2 y=2 w=256 h=256 jpeg=24104
+2026-09-23T16:59:00.067Z	IN	TILE	delivery=15 epoch=2 z=3 x=3 y=2 w=256 h=256 jpeg=11913
+2026-09-23T16:59:00.068Z	IN	TILE	delivery=16 epoch=2 z=3 x=4 y=2 w=72 h=256 jpeg=1465
+2026-09-23T16:59:00.069Z	OUT	ACK_STATE	epoch=2 received=[[9,9]] missing=[]
+2026-09-23T16:59:00.070Z	OUT	ACK_STATE	epoch=2 received=[[10,10]] missing=[]
+2026-09-23T16:59:00.070Z	OUT	ACK_STATE	epoch=2 received=[[11,11]] missing=[]
+2026-09-23T16:59:00.070Z	OUT	ACK_STATE	epoch=2 received=[[12,12]] missing=[]
+2026-09-23T16:59:00.070Z	OUT	ACK_STATE	epoch=2 received=[[13,13]] missing=[]
+2026-09-23T16:59:00.070Z	OUT	ACK_STATE	epoch=2 received=[[14,14]] missing=[]
+2026-09-23T16:59:00.070Z	OUT	ACK_STATE	epoch=2 received=[[15,15]] missing=[]
+2026-09-23T16:59:00.070Z	OUT	ACK_STATE	epoch=2 received=[[16,16]] missing=[]
+2026-09-23T16:59:00.081Z	IN	TILE	delivery=17 epoch=2 z=3 x=0 y=3 w=256 h=47 jpeg=3271
+2026-09-23T16:59:00.081Z	IN	TILE	delivery=18 epoch=2 z=3 x=1 y=3 w=256 h=47 jpeg=2111
+2026-09-23T16:59:00.082Z	IN	TILE	delivery=19 epoch=2 z=3 x=2 y=3 w=256 h=47 jpeg=801
+2026-09-23T16:59:00.082Z	IN	TILE	delivery=20 epoch=2 z=3 x=3 y=3 w=256 h=47 jpeg=801
+2026-09-23T16:59:00.082Z	IN	TILE	delivery=21 epoch=2 z=3 x=4 y=3 w=72 h=47 jpeg=669
+2026-09-23T16:59:00.082Z	IN	DONE	epoch=2 sentTiles=21
+2026-09-23T16:59:00.082Z	LOCAL	DONE_STATE	decode=5 pintura=0
+2026-09-23T16:59:00.089Z	OUT	ACK_STATE	epoch=2 received=[[17,17]] missing=[]
+2026-09-23T16:59:00.089Z	OUT	ACK_STATE	epoch=2 received=[[18,18]] missing=[]
+2026-09-23T16:59:00.089Z	OUT	ACK_STATE	epoch=2 received=[[19,19]] missing=[]
+2026-09-23T16:59:00.089Z	OUT	ACK_STATE	epoch=2 received=[[20,20]] missing=[]
+2026-09-23T16:59:00.089Z	OUT	ACK_STATE	epoch=2 received=[[21,21]] missing=[]
