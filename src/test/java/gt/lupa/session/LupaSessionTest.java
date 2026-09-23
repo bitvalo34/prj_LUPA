@@ -159,6 +159,65 @@ class LupaSessionTest {
     }
 
     @Test
+    void allReleaseStatusesFreeExactlyOnceAndDuplicateAfterEpochIsIdempotent() throws Exception {
+        LupaSession session = new LupaSession(
+                publishedImage(), fakeTileReader(140_000), Runnable::run);
+        CapturingSender sender = new CapturingSender();
+        session.onOpen(sender);
+
+        hello(session, sender, 524288);
+        session.onText(sender, "{\"type\":\"OPEN\",\"epoch\":1,\"imageId\":\"photo\"}");
+
+        session.onText(sender, coarseView(2));
+        assertEquals(1, sender.binaries.size());
+        int displayed = header(sender.binaries.getLast()).path("deliveryId").asInt();
+        assertCreditInvariant(session);
+        release(session, sender, displayed, "displayed");
+        assertEquals(0, session.snapshotForTest().pendingDeliveries());
+        assertEquals(0, session.snapshotForTest().reservedBytes());
+        assertCreditInvariant(session);
+
+        session.onText(sender, coarseView(3));
+        int discarded = header(sender.binaries.getLast()).path("deliveryId").asInt();
+        assertCreditInvariant(session);
+        release(session, sender, discarded, "discarded");
+        assertEquals(0, session.snapshotForTest().pendingDeliveries());
+        assertEquals(0, session.snapshotForTest().reservedBytes());
+        assertCreditInvariant(session);
+
+        session.onText(sender, coarseView(4));
+        int failed = header(sender.binaries.getLast()).path("deliveryId").asInt();
+        assertCreditInvariant(session);
+        release(session, sender, failed, "failed");
+        assertEquals(0, session.snapshotForTest().pendingDeliveries());
+        assertEquals(0, session.snapshotForTest().reservedBytes());
+        assertCreditInvariant(session);
+
+        session.onText(sender, coarseView(5));
+        LupaSession.SessionSnapshot beforeDuplicate = session.snapshotForTest();
+        int binariesBeforeDuplicate = sender.binaries.size();
+
+        release(session, sender, failed, "discarded");
+        LupaSession.SessionSnapshot afterDuplicate = session.snapshotForTest();
+        assertEquals(beforeDuplicate.freeWindowBytes(), afterDuplicate.freeWindowBytes());
+        assertEquals(beforeDuplicate.reservedBytes(), afterDuplicate.reservedBytes());
+        assertEquals(beforeDuplicate.pendingDeliveries(), afterDuplicate.pendingDeliveries());
+        assertEquals(binariesBeforeDuplicate, sender.binaries.size(),
+                "duplicate RELEASE from an older epoch must not create credit");
+        assertCreditInvariant(session);
+
+        release(session, sender, 2_000_000_000, "discarded");
+        LupaSession.SessionSnapshot afterUnknown = session.snapshotForTest();
+        assertEquals(afterDuplicate.freeWindowBytes(), afterUnknown.freeWindowBytes());
+        assertEquals(afterDuplicate.reservedBytes(), afterUnknown.reservedBytes());
+        assertEquals(afterDuplicate.pendingDeliveries(), afterUnknown.pendingDeliveries());
+        assertEquals(binariesBeforeDuplicate, sender.binaries.size(),
+                "unknown deliveryId must be a no-op");
+        assertCreditInvariant(session);
+        assertNull(sender.closeCode);
+    }
+
+    @Test
     void staleDiskReadDoesNotEmitTileForReplacedEpoch() throws Exception {
         PublishedImageStore store = publishedImage();
         ManualExecutor disk = new ManualExecutor();
@@ -172,11 +231,20 @@ class LupaSessionTest {
                 """);
         session.onText(sender, view(2));
         assertEquals(1, disk.size());
+        assertEquals(0, session.snapshotForTest().pendingDeliveries(),
+                "a queued disk read has not reserved delivery credit yet");
+        assertEquals(0, session.snapshotForTest().reservedBytes());
+        assertCreditInvariant(session);
 
         session.onText(sender, view(3));
         assertEquals(2, disk.size());
+        assertEquals(0, session.snapshotForTest().pendingDeliveries(),
+                "replacing the plan before the read completes must not reserve bytes");
+        assertEquals(0, session.snapshotForTest().reservedBytes());
+        assertCreditInvariant(session);
 
         disk.runAll();
+        assertCreditInvariant(session);
 
         assertFalse(sender.binaries.isEmpty());
         for (byte[] binary : sender.binaries) {
@@ -360,10 +428,14 @@ class LupaSessionTest {
         assertNotNull(sender.firstSend);
         assertFalse(sender.firstSend.committed());
         assertEquals(0, sender.binaries.size(), "queued tile must not be visible on the wire");
+        assertEquals(1, session.snapshotForTest().pendingDeliveries());
+        assertTrue(session.snapshotForTest().reservedBytes() > 0);
+        assertCreditInvariant(session);
 
         session.onText(sender, view(3));
 
         assertTrue(sender.firstSend.cancelled);
+        assertCreditInvariant(session);
         assertFalse(sender.binaries.isEmpty(),
                 "credit from cancelled uncommitted delivery must be refunded for the new plan");
         JsonNode firstVisible = header(sender.binaries.getFirst());
@@ -390,14 +462,19 @@ class LupaSessionTest {
         assertTrue(sender.firstSend.committed());
         assertEquals(1, sender.binaries.size());
         int oldDelivery = header(sender.binaries.getFirst()).get("deliveryId").asInt();
+        assertEquals(1, session.snapshotForTest().pendingDeliveries());
+        assertCreditInvariant(session);
 
         session.onText(sender, view(3));
         assertEquals(1, sender.binaries.size(),
                 "committed old TILE keeps its credit and cannot be removed by VIEW replacement");
+        assertEquals(1, session.snapshotForTest().pendingDeliveries());
+        assertCreditInvariant(session);
 
         session.onText(sender,
                 "{\"type\":\"RELEASE\",\"deliveryId\":" + oldDelivery
                         + ",\"status\":\"discarded\"}");
+        assertCreditInvariant(session);
 
         assertTrue(sender.binaries.size() >= 2,
                 "RELEASE of old epoch must restore credit and let the current plan advance");
@@ -413,6 +490,7 @@ class LupaSessionTest {
 
         assertEquals(beforeLateCallback, sender.binaries.size(),
                 "late write callback and duplicate RELEASE must not manufacture credit");
+        assertCreditInvariant(session);
         assertNull(sender.closeCode);
     }
 
@@ -604,9 +682,38 @@ class LupaSessionTest {
                 """.formatted(epoch);
     }
 
+    private static String coarseView(int epoch) {
+        return """
+                {"type":"VIEW","epoch":%d,"imageId":"photo","imageVersion":"v1",
+                 "rect":{"x":0,"y":0,"width":1024,"height":768},
+                 "viewportPx":{"width":512,"height":384},
+                 "detailOffset":-1,"mode":"uniform","focus":null}
+                """.formatted(epoch);
+    }
+
+    private static void assertCreditInvariant(LupaSession session) {
+        LupaSession.SessionSnapshot snapshot = session.snapshotForTest();
+        if (snapshot.negotiatedWindowBytes() == 0) return;
+        assertTrue(snapshot.freeWindowBytes() >= 0, "free credit must never be negative");
+        assertTrue(snapshot.reservedBytes() >= 0, "reserved bytes must never be negative");
+        assertEquals(
+                snapshot.negotiatedWindowBytes(),
+                snapshot.freeWindowBytes() + snapshot.reservedBytes(),
+                "free + reserved must equal the negotiated window");
+    }
+
     private void release(LupaSession session, CapturingSender sender, int deliveryId) {
+        release(session, sender, deliveryId, "discarded");
+    }
+
+    private void release(
+            LupaSession session,
+            CapturingSender sender,
+            int deliveryId,
+            String status) {
         session.onText(sender,
-                "{\"type\":\"RELEASE\",\"deliveryId\":" + deliveryId + ",\"status\":\"discarded\"}");
+                "{\"type\":\"RELEASE\",\"deliveryId\":" + deliveryId
+                        + ",\"status\":\"" + status + "\"}");
     }
 
     private TileReader fakeTileReader(int bytes) {
