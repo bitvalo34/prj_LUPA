@@ -583,7 +583,7 @@ export class LupaClient {
           ' currentEpoch=' + this.epoch +
           ' discarded antes del Worker'
       );
-      this.release(header.deliveryId, connectionId, 'discarded');
+      this.release(header.deliveryId, connectionId, header.epoch, 'discarded');
       this.notifySoon();
       return;
     }
@@ -597,7 +597,7 @@ export class LupaClient {
     if (!this.budget.reserve(jobId, decodedBytes)) {
       this.discardedTiles++;
       this.trace.push('LOCAL', 'BUDGET_DROP', 'delivery=' + header.deliveryId + ' rgba=' + decodedBytes);
-      this.release(header.deliveryId, connectionId, 'discarded');
+      this.release(header.deliveryId, connectionId, header.epoch, 'discarded');
       this.notifySoon();
       return;
     }
@@ -646,14 +646,14 @@ export class LupaClient {
         this.budget.cancel(response.jobId);
         this.discardedTiles++;
         if (response.connectionId === this.connectionId) {
-          this.release(response.deliveryId, response.connectionId, 'discarded');
+          this.release(response.deliveryId, response.connectionId, response.epoch, 'discarded');
         }
       } else {
         const bytes = this.budget.commit(response.jobId, pending.kind);
         if (bytes === null || !this.compositor) {
           response.bitmap.close();
           this.discardedTiles++;
-          this.release(response.deliveryId, response.connectionId, 'discarded');
+          this.release(response.deliveryId, response.connectionId, response.epoch, 'discarded');
         } else {
           this.pendingPresentations++;
           const accepted = this.compositor.store(
@@ -664,14 +664,14 @@ export class LupaClient {
             () => {
               this.pendingPresentations = Math.max(0, this.pendingPresentations - 1);
               this.drawnTiles++;
-              this.release(response.deliveryId, response.connectionId, 'displayed');
+              this.release(response.deliveryId, response.connectionId, response.epoch, 'displayed');
               this.updateCompletionPhase();
               this.notifySoon();
             },
             () => {
               this.pendingPresentations = Math.max(0, this.pendingPresentations - 1);
               this.discardedTiles++;
-              this.release(response.deliveryId, response.connectionId, 'discarded');
+              this.release(response.deliveryId, response.connectionId, response.epoch, 'discarded');
               this.updateCompletionPhase();
               this.notifySoon();
             }
@@ -680,7 +680,7 @@ export class LupaClient {
             this.pendingPresentations = Math.max(0, this.pendingPresentations - 1);
             this.budget.removeStored(pending.kind, bytes);
             this.discardedTiles++;
-            this.release(response.deliveryId, response.connectionId, 'discarded');
+            this.release(response.deliveryId, response.connectionId, response.epoch, 'discarded');
           }
         }
       }
@@ -689,7 +689,7 @@ export class LupaClient {
       if (response.connectionId === this.connectionId) {
         if (response.type === 'discarded') {
           this.discardedTiles++;
-          this.release(response.deliveryId, response.connectionId, 'discarded');
+          this.release(response.deliveryId, response.connectionId, response.epoch, 'discarded');
         } else {
           this.failedTiles++;
           if (!this.requestSelectiveRetry(
@@ -697,7 +697,7 @@ export class LupaClient {
             response.connectionId,
             response.epoch
           )) {
-            this.release(response.deliveryId, response.connectionId, 'failed');
+            this.release(response.deliveryId, response.connectionId, response.epoch, 'failed');
           }
         }
       }
@@ -991,7 +991,12 @@ export class LupaClient {
     }
   }
 
-  private release(deliveryId: number, connectionId: number, status: ReleaseStatus): void {
+  private release(
+    deliveryId: number,
+    connectionId: number,
+    epoch: number,
+    status: ReleaseStatus
+  ): void {
     if (connectionId !== this.connectionId || !this.transport?.isOpen) return;
 
     const sent = this.ledger.releaseOnce(deliveryId, connectionId, status, (id) => {
@@ -1005,7 +1010,7 @@ export class LupaClient {
        */
       this.send({
         type: 'ACK_STATE',
-        epoch: this.epoch,
+        epoch,
         received: [[id, id]],
         missing: []
       });

@@ -250,6 +250,13 @@ describe('ciclo de vida A22', () => {
       reason: 'invalidated by OPEN'
     });
 
+    expect(transport.sent.at(-1)).toEqual({
+      type: 'ACK_STATE',
+      epoch: 1,
+      received: [[1, 1]],
+      missing: []
+    });
+
     expect(client.snapshot().pendingDecodes).toBe(0);
     expect(client.snapshot().phase).toBe('ready');
     expect(client.snapshot().error).toContain('termine la importación');
