@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import gt.lupa.storage.CatalogException;
 import gt.lupa.storage.CatalogImage;
 import gt.lupa.storage.CatalogPublisher;
+import gt.lupa.storage.CatalogSnapshot;
 import gt.lupa.storage.ImageManifest;
 import java.io.IOException;
 import java.io.InputStream;
@@ -22,11 +23,15 @@ import java.util.HexFormat;
 import java.util.UUID;
 
 public final class PublicationService {
-    private final CatalogPublisher catalogPublisher;
+    private final CatalogPublication catalogPublication;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public PublicationService(CatalogPublisher catalogPublisher) {
-        this.catalogPublisher = catalogPublisher;
+        this(catalogPublisher::publish);
+    }
+
+    PublicationService(CatalogPublication catalogPublication) {
+        this.catalogPublication = catalogPublication;
     }
 
     public PublicationResult publish(
@@ -98,7 +103,7 @@ public final class PublicationService {
             );
             try {
                 System.out.println("[A19] updating catalog atomically...");
-                catalogPublisher.publish(layout.catalog(), image);
+                catalogPublication.publish(layout.catalog(), image);
             } catch (CatalogException e) {
                 cleanupJobBestEffort(staging.jobDirectory(), e);
                 throw new IngestException(
@@ -277,6 +282,11 @@ public final class PublicationService {
             primary.addSuppressed(cleanup);
         }
     }
+}
+
+@FunctionalInterface
+interface CatalogPublication {
+    CatalogSnapshot publish(Path catalogPath, CatalogImage image) throws CatalogException;
 }
 
 record PublicationResult(

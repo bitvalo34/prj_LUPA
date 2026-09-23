@@ -39,3 +39,15 @@ No existe fallback automático al modo muestra.
 - Lente habilita `mode=focus`; un clic fija el foco y el control deslizante cambia su radio físico.
 
 Cada interacción envía VIEW con una época nueva. El Canvas conserva solo la miniatura entre épocas y cierra los demás bitmaps antes de incorporar el plan nuevo.
+
+## Revisión funcional A22
+
+- `Recargar catálogo` conserva la última lista válida si la petición nueva falla.
+- Una versión recién publicada se anuncia sin reemplazar silenciosamente la versión ya abierta; pulsa de nuevo el cartucho para enviar otro `OPEN`.
+- Los cierres y errores remotos incluyen una explicación y una acción de recuperación.
+- La telemetría muestra TILE fallidos, `DONE.sentTiles` y el balance de TILE contabilizados.
+- `Guardar traza` genera `lupa-a22-trace-*.txt` con un resumen final de versión, contadores, pendientes y memoria administrada.
+
+Los contadores son acumulativos por conexión. Cambiar imagen conserva los totales; reconectar crea otra conexión y los reinicia.
+
+La guía de importación, versiones, fallo controlado y memoria está en `docs/A22.md`.

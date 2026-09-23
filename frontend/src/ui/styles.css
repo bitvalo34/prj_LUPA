@@ -445,6 +445,15 @@ h1 span {
   font-size: 10px;
 }
 
+.cart-label em {
+  grid-column: 2;
+  margin-top: 3px;
+  color: #8b3f2f;
+  font: 800 9px/1.2 monospace;
+  font-style: normal;
+  text-transform: uppercase;
+}
+
 .cart-emblem {
   grid-row: 1 / span 2;
   position: relative;
@@ -593,6 +602,11 @@ h1 span {
   color: #ffd9d3;
 }
 
+.screen-error .screen-action {
+  margin-top: 8px;
+  pointer-events: auto;
+}
+
 .idle-prism {
   width: 54px;
   height: 54px;
@@ -709,6 +723,8 @@ h1 span {
 }
 
 .recoverable-error {
+  display: grid;
+  gap: 8px;
   margin: 10px 0;
   padding: 8px;
   border: 1px solid #a95049;
@@ -717,6 +733,8 @@ h1 span {
   color: #642c29;
   font-size: 11px;
 }
+
+.recoverable-error .console-button { justify-self: stretch; }
 
 .telemetry-panel {
   display: flex;

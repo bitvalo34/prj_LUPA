@@ -41,7 +41,7 @@ import { TraceBuffer, type TraceEntry } from './TraceBuffer';
 import { sha256Hex } from './tileDigest';
 import type { LupaTransport } from './transport';
 import { WebSocketTransport } from './WebSocketTransport';
-import { deriveTransferPhase } from './state';
+import { deriveTransferPhase, describeRemoteError, describeSocketClose } from './state';
 
 export type ViewerPhase =
   | 'disconnected'
@@ -57,6 +57,7 @@ export interface ClientSnapshot {
   phase: ViewerPhase;
   connectionId: number;
   selectedImageId: string | null;
+  selectedImageVersion: string | null;
   manifest: Manifest | null;
   plan: Plan | null;
   welcome: Welcome | null;
@@ -234,8 +235,12 @@ export class LupaClient {
       onClose: (code, reason) => {
         if (connectionAtOpen !== this.connectionId) return;
         this.trace.push('LOCAL', 'WS_CLOSE', 'code=' + code + ' ' + reason);
+        const closeMessage = describeSocketClose(code, reason);
         this.cleanupConnection(connectionAtOpen);
-        if (this.phase !== 'error') this.phase = 'disconnected';
+        if (this.phase !== 'error') {
+          this.phase = 'disconnected';
+          this.error = closeMessage;
+        }
         this.emitNow();
       },
       onError: (message) => {
@@ -251,10 +256,15 @@ export class LupaClient {
   selectImage(image: CatalogImage): void {
     this.selected = image;
     if (!this.welcome || !this.transport?.isOpen) {
-      this.phase = this.phase === 'connecting' ? 'connecting' : 'ready';
+      if (this.phase !== 'connecting' && this.phase !== 'error') this.phase = 'disconnected';
       this.emitNow();
       return;
     }
+    this.openSelected();
+  }
+
+  retrySelectedImage(): void {
+    if (!this.selected || !this.welcome || !this.transport?.isOpen) return;
     this.openSelected();
   }
 
@@ -286,15 +296,37 @@ export class LupaClient {
   }
 
   downloadTrace(): void {
+    const snapshot = this.snapshot();
+    const accounting = snapshot.drawnTiles + snapshot.discardedTiles + snapshot.failedTiles;
+    const summary = [
+      '# LUPA A22 trace',
+      '# generatedAt=' + new Date().toISOString(),
+      '# connection=' + snapshot.connectionId +
+        ' image=' + (snapshot.manifest?.imageId ?? snapshot.selectedImageId ?? '-') +
+        ' version=' + (snapshot.manifest?.imageVersion ?? snapshot.selectedImageVersion ?? '-') +
+        ' epoch=' + snapshot.activeEpoch,
+      '# tiles received=' + snapshot.receivedTiles +
+        ' terminal=' + accounting +
+        ' drawn=' + snapshot.drawnTiles +
+        ' discarded=' + snapshot.discardedTiles +
+        ' failed=' + snapshot.failedTiles +
+        ' releases=' + snapshot.releases +
+        ' doneSent=' + (snapshot.doneSentTiles ?? '-'),
+      '# pending decode=' + snapshot.pendingDecodes +
+        ' paint=' + snapshot.pendingPresentations +
+        ' managedBitmapBytes=' + snapshot.managedBitmapBytes,
+      '# phase=' + snapshot.phase + ' error=' + (snapshot.error ?? '-'),
+      ''
+    ].join('\n');
     const lines = this.trace
       .snapshot()
       .map((entry) => [entry.at, entry.direction, entry.event, entry.detail].join('\t'))
       .join('\n');
-    const blob = new Blob([lines + '\n'], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob([summary + lines + '\n'], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'lupa-a21-trace-' + new Date().toISOString().replace(/[:.]/g, '-') + '.txt';
+    anchor.download = 'lupa-a22-trace-' + new Date().toISOString().replace(/[:.]/g, '-') + '.txt';
     anchor.click();
     URL.revokeObjectURL(url);
   }
@@ -304,6 +336,10 @@ export class LupaClient {
       phase: this.phase,
       connectionId: this.connectionId,
       selectedImageId: this.selected?.imageId ?? null,
+      selectedImageVersion:
+        this.manifest && this.selected && this.manifest.imageId === this.selected.imageId
+          ? this.manifest.imageVersion
+          : this.selected?.imageVersion ?? null,
       manifest: this.manifest,
       plan: this.plan,
       welcome: this.welcome,
@@ -354,6 +390,7 @@ export class LupaClient {
     }
     this.compositor?.reset();
     this.budget.reset();
+    this.pendingPresentations = 0;
     this.ledger.clear();
     this.manifest = null;
     this.activeViewRect = null;
@@ -456,9 +493,27 @@ export class LupaClient {
             this.trace.push('LOCAL', 'STALE_ERROR', 'epoch=' + remote.epoch + ' code=' + remote.code);
             return;
           }
-          this.error = remote.code + ': ' + remote.message;
+          if (remote.epoch !== undefined && remote.epoch > this.epoch) {
+            throw new Error('ERROR pertenece a una época futura');
+          }
+          this.error = describeRemoteError(remote);
           this.trace.push('LOCAL', 'REMOTE_ERROR', this.error);
-          this.updateCompletionPhase();
+          if (remote.code === 'VERSION_UNSUPPORTED' || !this.welcome) {
+            this.phase = 'error';
+            this.emitNow();
+            return;
+          }
+          if (!this.manifest) {
+            this.phase = 'ready';
+            this.emitNow();
+            return;
+          }
+          // ERROR termina la intención actual sin fingir un DONE. Los TILE ya
+          // recibidos todavía se contabilizan y liberan antes de volver a observar.
+          this.plan = null;
+          this.phase = this.pending.size > 0 || this.pendingPresentations > 0
+            ? 'processing'
+            : 'observing';
           this.emitNow();
           return;
         }
@@ -659,6 +714,10 @@ export class LupaClient {
   }
 
   private updateCompletionPhase(): void {
+    if (this.error && !this.manifest) {
+      this.phase = this.welcome ? 'ready' : 'error';
+      return;
+    }
     const next = deriveTransferPhase(
       this.serverDone,
       this.pending.size,
@@ -666,6 +725,7 @@ export class LupaClient {
       this.plan !== null
     );
     if (next) this.phase = next;
+    else if (this.error && this.manifest) this.phase = 'observing';
   }
 
   private openSelected(): void {
@@ -676,6 +736,21 @@ export class LupaClient {
     this.settleTimer = 0;
     const epoch = this.nextEpoch();
     if (epoch === null) return;
+    this.error = null;
+    let cancelledReservations = 0;
+    for (const [jobId, pending] of this.pending) {
+      if (pending.connectionId === this.connectionId && pending.epoch < epoch) {
+        this.budget.cancel(jobId);
+        cancelledReservations++;
+      }
+    }
+    if (cancelledReservations > 0) {
+      this.trace.push(
+        'LOCAL',
+        'OPEN_CANCEL_RESERVATIONS',
+        'epoch=' + epoch + ' reservations=' + cancelledReservations
+      );
+    }
     this.manifest = null;
     this.activeViewRect = null;
     this.focus = null;

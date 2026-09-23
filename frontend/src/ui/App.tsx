@@ -8,15 +8,24 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent
 } from 'react';
-import type { Catalog, CatalogImage } from '../protocol/types';
-import { loadCatalog } from '../runtime/catalog';
+import type { CatalogImage } from '../protocol/types';
+import {
+  catalogLoadFailed,
+  catalogLoadStarted,
+  catalogLoadSucceeded,
+  hasNewCatalogVersion,
+  loadCatalog,
+  type CatalogLoadState
+} from '../runtime/catalog';
 import { LupaClient, type ClientSnapshot } from '../runtime/LupaClient';
 import { SampleTransport, SAMPLE_CATALOG } from '../runtime/SampleTransport';
+import { deriveTileAccounting } from '../runtime/state';
 
 const INITIAL_SNAPSHOT: ClientSnapshot = {
   phase: 'disconnected',
   connectionId: 0,
   selectedImageId: null,
+  selectedImageVersion: null,
   manifest: null,
   plan: null,
   welcome: null,
@@ -65,32 +74,31 @@ export function App() {
     moved: boolean;
   } | null>(null);
   const [snapshot, setSnapshot] = useState<ClientSnapshot>(INITIAL_SNAPSHOT);
-  const [catalog, setCatalog] = useState<Catalog | null>(sampleMode ? SAMPLE_CATALOG : null);
-  const [catalogError, setCatalogError] = useState<string | null>(null);
-  const [catalogBusy, setCatalogBusy] = useState(!sampleMode);
+  const [catalogState, setCatalogState] = useState<CatalogLoadState>({
+    catalog: sampleMode ? SAMPLE_CATALOG : null,
+    busy: !sampleMode,
+    error: null
+  });
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+
+  const { catalog, busy: catalogBusy, error: catalogError } = catalogState;
 
   async function refreshCatalog() {
     if (sampleMode) {
-      setCatalog(SAMPLE_CATALOG);
-      setCatalogError(null);
+      setCatalogState(catalogLoadSucceeded(SAMPLE_CATALOG));
       return;
     }
     const requestId = ++catalogRequestRef.current;
     catalogAbortRef.current?.abort();
     const controller = new AbortController();
     catalogAbortRef.current = controller;
-    setCatalogBusy(true);
-    setCatalogError(null);
+    setCatalogState(catalogLoadStarted);
     try {
       const next = await loadCatalog(controller.signal);
-      if (requestId === catalogRequestRef.current) setCatalog(next);
+      if (requestId === catalogRequestRef.current) setCatalogState(catalogLoadSucceeded(next));
     } catch (error) {
       if (controller.signal.aborted || requestId !== catalogRequestRef.current) return;
-      setCatalog(null);
-      setCatalogError(error instanceof Error ? error.message : 'No se pudo cargar el catálogo');
-    } finally {
-      if (requestId === catalogRequestRef.current) setCatalogBusy(false);
+      setCatalogState((current) => catalogLoadFailed(current, error));
     }
   }
 
@@ -210,6 +218,15 @@ export function App() {
     action();
   }
 
+  const tileAccounting = deriveTileAccounting(
+    snapshot.receivedTiles,
+    snapshot.drawnTiles,
+    snapshot.discardedTiles,
+    snapshot.failedTiles,
+    snapshot.pendingDecodes,
+    snapshot.pendingPresentations
+  );
+
   return (
     <div className="app-shell">
       <div className="ambient-orbit" aria-hidden="true">
@@ -245,7 +262,12 @@ export function App() {
               <h2>Cartuchos</h2>
             </div>
             {!sampleMode && (
-              <button className="icon-button" onClick={() => void refreshCatalog()} aria-label="Recargar catálogo">
+              <button
+                className="icon-button"
+                onClick={() => void refreshCatalog()}
+                aria-label="Recargar catálogo"
+                disabled={catalogBusy}
+              >
                 ↻
               </button>
             )}
@@ -254,8 +276,9 @@ export function App() {
           {catalogBusy && <div className="catalog-message">Leyendo catálogo…</div>}
           {catalogError && (
             <div className="catalog-message error-card">
-              <strong>Catálogo no disponible</strong>
+              <strong>{catalog ? 'No se pudo actualizar' : 'Catálogo no disponible'}</strong>
               <span>{catalogError}</span>
+              {catalog && <span>Se conserva la última lista válida.</span>}
               <button className="console-button" onClick={() => void refreshCatalog()}>Reintentar</button>
             </div>
           )}
@@ -269,7 +292,11 @@ export function App() {
                 key={image.imageId + image.imageVersion}
                 image={image}
                 index={index}
-                selected={snapshot.selectedImageId === image.imageId}
+                selected={
+                  snapshot.selectedImageId === image.imageId &&
+                  snapshot.selectedImageVersion === image.imageVersion
+                }
+                newVersionAvailable={hasNewCatalogVersion(image, snapshot.manifest)}
                 onSelect={() => selectImage(image)}
               />
             ))}
@@ -296,17 +323,35 @@ export function App() {
                 aria-label="Visor navegable. Arrastra para desplazar, usa la rueda para acercar o alejar y las flechas para mover la vista."
               >
                 <canvas ref={canvasRef} aria-label="Imagen científica compuesta progresivamente" />
-                {!snapshot.manifest && (
+                {!snapshot.manifest && !supportError && !snapshot.error && (
                   <div className="screen-idle">
                     <div className="idle-prism" aria-hidden="true" />
                     <strong>Selecciona un cartucho</strong>
                     <span>La miniatura real llegará como TILE z=0.</span>
                   </div>
                 )}
-                {(snapshot.phase === 'error' || supportError) && (
+                {(supportError || snapshot.phase === 'error' || (!snapshot.manifest && snapshot.error)) && (
                   <div className="screen-error" role="alert">
-                    <strong>{supportError ? 'Navegador no compatible' : 'La señal se interrumpió'}</strong>
+                    <strong>
+                      {supportError
+                        ? 'Navegador no compatible'
+                        : snapshot.phase === 'ready'
+                          ? 'No se pudo abrir la imagen'
+                          : 'La señal se interrumpió'}
+                    </strong>
                     <span>{supportError ?? snapshot.error}</span>
+                    {!supportError && client && (
+                      <button
+                        className="console-button small screen-action"
+                        onClick={() =>
+                          snapshot.phase === 'ready'
+                            ? client.retrySelectedImage()
+                            : client.reconnect()
+                        }
+                      >
+                        {snapshot.phase === 'ready' ? 'Reintentar imagen' : 'Reconectar'}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -334,13 +379,26 @@ export function App() {
           <Metric label="TILE recibidos" value={String(snapshot.receivedTiles)} />
           <Metric label="Dibujados" value={String(snapshot.drawnTiles)} />
           <Metric label="Descartados" value={String(snapshot.discardedTiles)} />
+          <Metric label="Fallidos" value={String(snapshot.failedTiles)} />
           <Metric label="RELEASE" value={String(snapshot.releases)} />
+          <Metric label="DONE servidor" value={snapshot.doneSentTiles === null ? '—' : String(snapshot.doneSentTiles)} />
+          <Metric
+            label="Balance TILE"
+            value={tileAccounting.accounted + '/' + snapshot.receivedTiles + (tileAccounting.balanced ? ' ✓' : ' !')}
+          />
           <Metric label="Decodificando" value={String(snapshot.pendingDecodes)} />
           <Metric label="Por pintar" value={String(snapshot.pendingPresentations)} />
           <Metric label="Bitmaps LUPA" value={formatBytes(snapshot.managedBitmapBytes)} />
           <Metric label="Región VIEW" value={formatRect(snapshot.activeViewRect)} />
-          <p className="memory-note">Memoria administrada por LUPA; no representa toda la RAM/GPU del navegador.</p>
-          {snapshot.error && snapshot.phase !== 'error' && <p className="recoverable-error" role="status">{snapshot.error}</p>}
+          <p className="memory-note">Presupuesto administrado por LUPA: 64 MiB. No representa toda la RAM/GPU del navegador.</p>
+          {snapshot.error && snapshot.phase !== 'error' && snapshot.manifest && (
+            <div className="recoverable-error" role="status">
+              <span>{snapshot.error}</span>
+              <button className="console-button small" onClick={() => client?.retrySelectedImage()}>
+                Volver a abrir
+              </button>
+            </div>
+          )}
           <button
             className="console-button secondary"
             onClick={() => setDiagnosticsOpen((value) => !value)}
@@ -385,11 +443,13 @@ function Cartridge({
   image,
   index,
   selected,
+  newVersionAvailable,
   onSelect
 }: {
   image: CatalogImage;
   index: number;
   selected: boolean;
+  newVersionAvailable: boolean;
   onSelect: () => void;
 }) {
   const hue = (hashCode(image.imageId) + index * 47) % 360;
@@ -405,6 +465,7 @@ function Cartridge({
         <span className="cart-emblem" aria-hidden="true"><i/><i/><i/></span>
         <strong>{image.imageId}</strong>
         <small>{image.width} × {image.height} · {image.imageVersion}</small>
+        {newVersionAvailable && <em>Nueva versión disponible</em>}
       </span>
       <span className="cart-chip">Z{image.maxLevel}</span>
     </button>
