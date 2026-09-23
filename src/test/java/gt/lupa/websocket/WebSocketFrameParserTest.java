@@ -72,6 +72,55 @@ class WebSocketFrameParserTest {
         assertEquals(1002, control.closeCode());
     }
 
+    @Test
+    void rejectsRsvSecondDataMessageAndAccumulatedFragmentOverflow() throws Exception {
+        byte[] rsv = masked(
+                true,
+                0x1,
+                "x".getBytes(StandardCharsets.UTF_8),
+                new byte[]{1,2,3,4});
+        rsv[0] |= 0x40;
+
+        WebSocketProtocolException rsvFailure = assertThrows(
+                WebSocketProtocolException.class,
+                () -> new WebSocketFrameParser(1024)
+                        .feed(ByteBuffer.wrap(rsv)));
+        assertEquals(1002, rsvFailure.closeCode());
+
+        WebSocketTextAssembler fragmented =
+                new WebSocketTextAssembler(16);
+        assertTrue(fragmented.accept(
+                new WebSocketFrame(false, 0x1, new byte[]{'a'}))
+                .isEmpty());
+
+        WebSocketProtocolException secondMessage = assertThrows(
+                WebSocketProtocolException.class,
+                () -> fragmented.accept(
+                        new WebSocketFrame(
+                                true,
+                                0x1,
+                                new byte[]{'b'})));
+        assertEquals(1002, secondMessage.closeCode());
+
+        WebSocketTextAssembler bounded =
+                new WebSocketTextAssembler(3);
+        assertTrue(bounded.accept(
+                new WebSocketFrame(
+                        false,
+                        0x1,
+                        new byte[]{'a','b'}))
+                .isEmpty());
+
+        WebSocketProtocolException overflow = assertThrows(
+                WebSocketProtocolException.class,
+                () -> bounded.accept(
+                        new WebSocketFrame(
+                                true,
+                                0x0,
+                                new byte[]{'c','d'})));
+        assertEquals(1009, overflow.closeCode());
+    }
+
     private static byte[] masked(boolean fin, int opcode, byte[] payload, byte[] mask) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.write((fin ? 0x80 : 0) | opcode);
