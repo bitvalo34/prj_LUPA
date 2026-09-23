@@ -1,6 +1,7 @@
 package gt.lupa.session;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import gt.lupa.concurrent.MonotonicScheduler;
@@ -40,6 +41,7 @@ public final class LupaSession implements WebSocketEndpoint {
     private static final AtomicInteger SESSION_IDS = new AtomicInteger();
     private static final int MAX_TILE_ENVELOPE_BYTES =
             4 + 4096 + LupaProtocol.MAX_TILE_BYTES;
+    private static final int MAX_SELECTIVE_RETRIES = 2;
 
     private final PublishedImageStore store;
     private final TileReader tileReader;
@@ -347,6 +349,7 @@ public final class LupaSession implements WebSocketEndpoint {
                 case "OPEN" -> handleOpen(sender, control);
                 case "VIEW" -> handleView(sender, control);
                 case "RELEASE" -> handleRelease(sender, control);
+                case "ACK_STATE" -> handleAckState(sender, control);
                 default -> policyClose(sender, "unknown or currently invalid LUPA control type: " + type);
             }
         } catch (LupaControlException e) {
@@ -640,9 +643,197 @@ public final class LupaSession implements WebSocketEndpoint {
             return;
         }
 
-        DeliveryReservation reservation = deliveries.remove(deliveryId);
+        DeliveryReservation reservation =
+                deliveries.get(deliveryId);
         if (reservation == null) {
-            diagnosticCredits("RELEASE_IGNORED", deliveryId, "status=" + status);
+            diagnosticCredits(
+                    "RELEASE_IGNORED",
+                    deliveryId,
+                    "status=" + status);
+            return;
+        }
+
+        int epoch = reservation.epoch;
+        acknowledgeDelivery(
+                sender,
+                deliveryId,
+                "RELEASE_" + status.toUpperCase());
+        diagnosticCredits(
+                "RELEASE",
+                deliveryId,
+                "status=" + status
+                        + " epoch=" + epoch);
+        pump();
+    }
+
+    /**
+     * SACK-inspired selective tile acknowledgement.
+     *
+     * received contains inclusive deliveryId ranges that are terminal at the
+     * client and therefore release their byte reservations. missing contains
+     * individual deliveryIds that must be selectively retransmitted. Unknown
+     * or stale ids are ignored; malformed/overlapping sets are protocol errors.
+     */
+    private void handleAckState(Sender sender, ObjectNode control)
+            throws LupaControlException {
+        LupaJson.requireOnly(
+                control,
+                "type",
+                "epoch",
+                "received",
+                "missing");
+
+        if (state == LupaSessionState.ESPERA_HELLO) {
+            policyClose(sender, "HELLO must complete before ACK_STATE");
+            return;
+        }
+
+        int epoch =
+                LupaJson.requireInt(
+                        control,
+                        "epoch",
+                        1,
+                        LupaProtocol.MAX_EPOCH);
+
+        JsonNode receivedNode = control.get("received");
+        JsonNode missingNode = control.get("missing");
+
+        if (receivedNode == null || !receivedNode.isArray()) {
+            throw new LupaControlException("received must be an array");
+        }
+        if (missingNode == null || !missingNode.isArray()) {
+            throw new LupaControlException("missing must be an array");
+        }
+        if (receivedNode.size() > 32 || missingNode.size() > 32) {
+            throw new LupaControlException(
+                    "ACK_STATE exceeds selective acknowledgement limits");
+        }
+
+        java.util.List<AckRange> ranges =
+                new java.util.ArrayList<>();
+
+        int previousEnd = 0;
+        for (JsonNode rangeNode : receivedNode) {
+            if (!rangeNode.isArray() || rangeNode.size() != 2) {
+                throw new LupaControlException(
+                        "received ranges must be [start,end]");
+            }
+
+            int start =
+                    requireDeliveryIdNode(
+                            rangeNode.get(0),
+                            "received range start");
+            int end =
+                    requireDeliveryIdNode(
+                            rangeNode.get(1),
+                            "received range end");
+
+            if (end < start) {
+                throw new LupaControlException(
+                        "received range end precedes start");
+            }
+            if (!ranges.isEmpty() && start <= previousEnd) {
+                throw new LupaControlException(
+                        "received ranges must be sorted and non-overlapping");
+            }
+
+            ranges.add(new AckRange(start, end));
+            previousEnd = end;
+        }
+
+        java.util.Set<Integer> missing =
+                new java.util.LinkedHashSet<>();
+
+        for (JsonNode node : missingNode) {
+            int deliveryId =
+                    requireDeliveryIdNode(
+                            node,
+                            "missing deliveryId");
+
+            if (!missing.add(deliveryId)) {
+                throw new LupaControlException(
+                        "missing deliveryId is duplicated");
+            }
+
+            for (AckRange range : ranges) {
+                if (range.contains(deliveryId)) {
+                    throw new LupaControlException(
+                            "deliveryId cannot be both received and missing");
+                }
+            }
+        }
+
+        java.util.List<Integer> acknowledged =
+                new java.util.ArrayList<>();
+
+        for (Map.Entry<Integer, DeliveryReservation> entry :
+                deliveries.entrySet()) {
+            DeliveryReservation reservation = entry.getValue();
+            if (reservation.epoch != epoch) continue;
+
+            for (AckRange range : ranges) {
+                if (range.contains(entry.getKey())) {
+                    acknowledged.add(entry.getKey());
+                    break;
+                }
+            }
+        }
+
+        for (Integer deliveryId : acknowledged) {
+            acknowledgeDelivery(
+                    sender,
+                    deliveryId,
+                    "ACK_STATE");
+        }
+
+        for (Integer deliveryId : missing) {
+            requestSelectiveRetransmit(
+                    sender,
+                    epoch,
+                    deliveryId);
+        }
+
+        diagnosticCredits(
+                "ACK_STATE",
+                null,
+                "epoch=" + epoch
+                        + " receivedRanges=" + ranges.size()
+                        + " missing=" + missing.size());
+
+        pump();
+    }
+
+    private static int requireDeliveryIdNode(
+            JsonNode node,
+            String field) throws LupaControlException {
+        if (node == null
+                || !node.isIntegralNumber()
+                || !node.canConvertToInt()) {
+            throw new LupaControlException(
+                    field + " must be an integer");
+        }
+
+        int value = node.intValue();
+        if (value < 1 || value > LupaProtocol.MAX_EPOCH) {
+            throw new LupaControlException(
+                    field + " is outside its allowed range");
+        }
+
+        return value;
+    }
+
+    private void acknowledgeDelivery(
+            Sender sender,
+            int deliveryId,
+            String source) {
+        DeliveryReservation reservation =
+                deliveries.remove(deliveryId);
+
+        if (reservation == null) {
+            diagnosticCredits(
+                    source + "_IGNORED",
+                    deliveryId,
+                    "unknown delivery");
             return;
         }
 
@@ -650,11 +841,264 @@ public final class LupaSession implements WebSocketEndpoint {
         reservation.state = DeliveryState.RELEASED;
         freeWindowBytes += reservation.reservedBytes;
         enforceCreditInvariant(sender);
-        diagnosticCredits("RELEASE", deliveryId,
-                "status=" + status
-                        + " epoch=" + reservation.epoch
+
+        diagnosticCredits(
+                source,
+                deliveryId,
+                "epoch=" + reservation.epoch
                         + " bytes=" + reservation.reservedBytes);
-        pump();
+    }
+
+    private void requestSelectiveRetransmit(
+            Sender sender,
+            int epoch,
+            int deliveryId) {
+        DeliveryReservation reservation =
+                deliveries.get(deliveryId);
+
+        if (reservation == null
+                || reservation.epoch != epoch
+                || reservation.state
+                        != DeliveryState.WRITTEN_AWAITING_RELEASE) {
+            diagnosticCredits(
+                    "ACK_MISSING_IGNORED",
+                    deliveryId,
+                    "epoch=" + epoch);
+            return;
+        }
+
+        if (reservation.retryInProgress) {
+            diagnosticCredits(
+                    "ACK_MISSING_DUPLICATE",
+                    deliveryId,
+                    "retry already in progress");
+            return;
+        }
+
+        if (reservation.selectiveRetries >= MAX_SELECTIVE_RETRIES) {
+            acknowledgeDelivery(
+                    sender,
+                    deliveryId,
+                    "ACK_RETRY_EXHAUSTED");
+            sendError(
+                    sender,
+                    epoch,
+                    LupaProtocol.ErrorCode.INTERNAL_READ_ERROR,
+                    "selective recovery retry limit reached for deliveryId "
+                            + deliveryId);
+            return;
+        }
+
+        if (opened == null
+                || currentEpoch != epoch
+                || activeImageDoesNotMatch(reservation)) {
+            acknowledgeDelivery(
+                    sender,
+                    deliveryId,
+                    "ACK_STALE_MISSING");
+            return;
+        }
+
+        reservation.retryInProgress = true;
+        reservation.selectiveRetries++;
+        cancelReleaseTimer(reservation);
+
+        PublishedImageStore.OpenedImage imageAtRead = opened;
+        ViewPlanner.TileRef ref = reservation.ref;
+
+        try {
+            diskExecutor.execute(
+                    () -> {
+                        TileData tile = null;
+                        TileReadException failure = null;
+                        try {
+                            tile =
+                                    tileReader.read(
+                                            imageAtRead,
+                                            ref.z(),
+                                            ref.x(),
+                                            ref.y());
+                        } catch (TileReadException e) {
+                            failure = e;
+                        } catch (RuntimeException e) {
+                            failure =
+                                    new TileReadException(
+                                            "unexpected selective retransmit failure",
+                                            e);
+                        }
+
+                        TileData result = tile;
+                        TileReadException error = failure;
+
+                        submitTileResult(
+                                () -> onSelectiveTileRead(
+                                        deliveryId,
+                                        result,
+                                        error),
+                                result);
+                    });
+        } catch (RejectedExecutionException e) {
+            reservation.retryInProgress = false;
+            armReleaseTimer(reservation);
+            sendError(
+                    sender,
+                    epoch,
+                    LupaProtocol.ErrorCode.INTERNAL_READ_ERROR,
+                    "server tile read queue is full during selective recovery");
+        }
+    }
+
+    private boolean activeImageDoesNotMatch(
+            DeliveryReservation reservation) {
+        return opened == null
+                || !opened.catalogImage().imageId()
+                        .equals(reservation.imageId)
+                || !opened.catalogImage().imageVersion()
+                        .equals(reservation.imageVersion);
+    }
+
+    private void onSelectiveTileRead(
+            int deliveryId,
+            TileData tile,
+            TileReadException failure) {
+        DeliveryReservation reservation =
+                deliveries.get(deliveryId);
+
+        if (reservation == null
+                || !reservation.retryInProgress
+                || reservation.state
+                        != DeliveryState.WRITTEN_AWAITING_RELEASE) {
+            if (tile != null) tile.close();
+            return;
+        }
+
+        if (failure != null || tile == null) {
+            if (tile != null) tile.close();
+            reservation.retryInProgress = false;
+            armReleaseTimer(reservation);
+            sendError(
+                    sender,
+                    reservation.epoch,
+                    LupaProtocol.ErrorCode.INTERNAL_READ_ERROR,
+                    "selective recovery could not reload deliveryId "
+                            + deliveryId);
+            return;
+        }
+
+        final byte[] header;
+        final byte[] envelope;
+        final int envelopeBytes;
+
+        try {
+            header =
+                    buildTileHeaderForReservation(
+                            reservation,
+                            tile);
+            envelopeBytes =
+                    Math.addExact(
+                            4 + header.length,
+                            tile.jpegLength());
+
+            if (envelopeBytes > MAX_TILE_ENVELOPE_BYTES) {
+                throw new IllegalArgumentException(
+                        "selective retransmit envelope exceeds protocol limit");
+            }
+
+            envelope =
+                    buildTileEnvelope(
+                            header,
+                            tile);
+        } catch (JsonProcessingException
+                 | IllegalArgumentException
+                 | ArithmeticException e) {
+            tile.close();
+            reservation.retryInProgress = false;
+            armReleaseTimer(reservation);
+            sendError(
+                    sender,
+                    reservation.epoch,
+                    LupaProtocol.ErrorCode.INTERNAL_READ_ERROR,
+                    "selective recovery could not encode deliveryId "
+                            + deliveryId);
+            return;
+        }
+
+        tile.close();
+
+        TransientBufferBudget.Lease transientLease = null;
+        if (transientBuffers != null) {
+            transientLease =
+                    transientBuffers.tryReserve(
+                            envelopeBytes);
+            if (transientLease == null) {
+                reservation.retryInProgress = false;
+                armReleaseTimer(reservation);
+                sendError(
+                        sender,
+                        reservation.epoch,
+                        LupaProtocol.ErrorCode.LIMIT_EXCEEDED,
+                        "selective recovery transient buffer budget is full");
+                return;
+            }
+            liveTransientBuffers.add(transientLease);
+        }
+
+        final TransientBufferBudget.Lease sendLease =
+                transientLease;
+
+        final WebSocketEndpoint.BinarySend write;
+        try {
+            write =
+                    sender.sendBinaryTracked(
+                            envelope,
+                            () -> {},
+                            () -> {
+                                releaseTransientBuffer(sendLease);
+                                submitSerial(
+                                        () -> onSelectiveTileWritten(
+                                                deliveryId),
+                                        sender);
+                            });
+        } catch (RuntimeException e) {
+            releaseTransientBuffer(sendLease);
+            reservation.retryInProgress = false;
+            armReleaseTimer(reservation);
+            sendError(
+                    sender,
+                    reservation.epoch,
+                    LupaProtocol.ErrorCode.INTERNAL_READ_ERROR,
+                    "selective recovery WebSocket write failed");
+            return;
+        }
+
+        if (!write.accepted()) {
+            releaseTransientBuffer(sendLease);
+            reservation.retryInProgress = false;
+            closed.set(true);
+            state = LupaSessionState.CERRADA;
+            sender.close(
+                    1011,
+                    "WebSocket write queue is full during selective recovery");
+        }
+    }
+
+    private void onSelectiveTileWritten(
+            int deliveryId) {
+        DeliveryReservation reservation =
+                deliveries.get(deliveryId);
+
+        if (reservation == null) return;
+
+        reservation.retryInProgress = false;
+        reservation.state =
+                DeliveryState.WRITTEN_AWAITING_RELEASE;
+        armReleaseTimer(reservation);
+
+        diagnosticCredits(
+                "RETRANSMIT",
+                deliveryId,
+                "retry=" + reservation.selectiveRetries
+                        + " epoch=" + reservation.epoch);
     }
 
     private void pump() {
@@ -966,6 +1410,9 @@ public final class LupaSession implements WebSocketEndpoint {
                 plan.generation,
                 reservationBytes,
                 pending.openingThumbnail(),
+                pending.ref,
+                opened.catalogImage().imageId(),
+                opened.catalogImage().imageVersion(),
                 transientLease);
         deliveries.put(deliveryId, reservation);
         freeWindowBytes -= reservationBytes;
@@ -1072,6 +1519,47 @@ public final class LupaSession implements WebSocketEndpoint {
         header.put("payloadBytes", tile.jpegLength());
 
         byte[] encodedHeader = json.mapper().writeValueAsBytes(header);
+        if (encodedHeader.length > 4096) {
+            throw new IllegalArgumentException(
+                    "TILE header exceeds LUPA v1 limit");
+        }
+        return encodedHeader;
+    }
+
+    private byte[] buildTileHeaderForReservation(
+            DeliveryReservation reservation,
+            TileData tile) throws JsonProcessingException {
+        if (tile.jpegLength() > LupaProtocol.MAX_TILE_BYTES) {
+            throw new IllegalArgumentException(
+                    "tile payload exceeds LUPA v1 limit");
+        }
+
+        ObjectNode header =
+                json.mapper().createObjectNode();
+        header.put("type", "TILE");
+        header.put(
+                "deliveryId",
+                reservation.deliveryId);
+        header.put("epoch", reservation.epoch);
+        header.put("imageId", reservation.imageId);
+        header.put(
+                "imageVersion",
+                reservation.imageVersion);
+        header.put("z", reservation.ref.z());
+        header.put("x", reservation.ref.x());
+        header.put("y", reservation.ref.y());
+        header.put("w", tile.width());
+        header.put("h", tile.height());
+        header.put("codec", "jpeg");
+        header.put(
+                "payloadBytes",
+                tile.jpegLength());
+        header.put(
+                "retry",
+                reservation.selectiveRetries);
+
+        byte[] encodedHeader =
+                json.mapper().writeValueAsBytes(header);
         if (encodedHeader.length > 4096) {
             throw new IllegalArgumentException(
                     "TILE header exceeds LUPA v1 limit");
@@ -1437,6 +1925,15 @@ public final class LupaSession implements WebSocketEndpoint {
             String openedImageId,
             Integer activePlanEpoch) {}
 
+    private record AckRange(
+            int start,
+            int end) {
+        private boolean contains(int deliveryId) {
+            return deliveryId >= start
+                    && deliveryId <= end;
+        }
+    }
+
     private static final class ActivePlan {
         private final long generation;
         private final ViewRequest view;
@@ -1482,8 +1979,13 @@ public final class LupaSession implements WebSocketEndpoint {
         private final long planGeneration;
         private final int reservedBytes;
         private final boolean openingThumbnail;
+        private final ViewPlanner.TileRef ref;
+        private final String imageId;
+        private final String imageVersion;
         private final TransientBufferBudget.Lease transientBuffer;
         private DeliveryState state = DeliveryState.RESERVED_QUEUED;
+        private int selectiveRetries;
+        private boolean retryInProgress;
         private WebSocketEndpoint.BinarySend write;
         private MonotonicScheduler.Handle releaseTimer;
         private long releaseDeadlineStartedNanos;
@@ -1494,12 +1996,18 @@ public final class LupaSession implements WebSocketEndpoint {
                 long planGeneration,
                 int reservedBytes,
                 boolean openingThumbnail,
+                ViewPlanner.TileRef ref,
+                String imageId,
+                String imageVersion,
                 TransientBufferBudget.Lease transientBuffer) {
             this.deliveryId = deliveryId;
             this.epoch = epoch;
             this.planGeneration = planGeneration;
             this.reservedBytes = reservedBytes;
             this.openingThumbnail = openingThumbnail;
+            this.ref = Objects.requireNonNull(ref);
+            this.imageId = Objects.requireNonNull(imageId);
+            this.imageVersion = Objects.requireNonNull(imageVersion);
             this.transientBuffer = transientBuffer;
         }
     }

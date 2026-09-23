@@ -562,8 +562,15 @@ export class LupaClient {
     }
 
     if (!this.ledger.register(header.deliveryId, connectionId)) {
-      this.protocolViolation(new Error('deliveryId duplicado'));
-      return;
+      if (!this.ledger.acceptRetransmission(header.deliveryId, connectionId)) {
+        this.protocolViolation(new Error('deliveryId duplicado sin recuperación solicitada'));
+        return;
+      }
+      this.trace.push(
+        'LOCAL',
+        'RETRANSMIT_ACCEPTED',
+        'delivery=' + header.deliveryId + ' epoch=' + header.epoch
+      );
     }
 
     if (header.epoch < this.epoch) {
@@ -685,7 +692,13 @@ export class LupaClient {
           this.release(response.deliveryId, response.connectionId, 'discarded');
         } else {
           this.failedTiles++;
-          this.release(response.deliveryId, response.connectionId, 'failed');
+          if (!this.requestSelectiveRetry(
+            response.deliveryId,
+            response.connectionId,
+            response.epoch
+          )) {
+            this.release(response.deliveryId, response.connectionId, 'failed');
+          }
         }
       }
       this.trace.push(
@@ -980,10 +993,62 @@ export class LupaClient {
 
   private release(deliveryId: number, connectionId: number, status: ReleaseStatus): void {
     if (connectionId !== this.connectionId || !this.transport?.isOpen) return;
-    const sent = this.ledger.releaseOnce(deliveryId, connectionId, status, (id, releaseStatus) => {
-      this.send({ type: 'RELEASE', deliveryId: id, status: releaseStatus });
+
+    const sent = this.ledger.releaseOnce(deliveryId, connectionId, status, (id) => {
+      /*
+       * ACK_STATE is the LUPA selective acknowledgement primitive. A single
+       * terminal delivery is represented as a one-element inclusive range;
+       * the wire format also allows callers/tools to batch adjacent ids.
+       *
+       * RELEASE remains accepted by the server for v1 compatibility, but the
+       * browser now exercises the selective acknowledgement path.
+       */
+      this.send({
+        type: 'ACK_STATE',
+        epoch: this.epoch,
+        received: [[id, id]],
+        missing: []
+      });
     });
+
     if (sent) this.releases++;
+  }
+
+  private requestSelectiveRetry(
+    deliveryId: number,
+    connectionId: number,
+    epoch: number
+  ): boolean {
+    if (
+      connectionId !== this.connectionId ||
+      epoch !== this.epoch ||
+      !this.transport?.isOpen
+    ) {
+      return false;
+    }
+
+    const requested = this.ledger.requestRetry(
+      deliveryId,
+      connectionId,
+      (id) => {
+        this.send({
+          type: 'ACK_STATE',
+          epoch,
+          received: [],
+          missing: [id]
+        });
+      }
+    );
+
+    if (requested) {
+      this.trace.push(
+        'OUT',
+        'SELECTIVE_RECOVERY',
+        'delivery=' + deliveryId + ' epoch=' + epoch
+      );
+    }
+
+    return requested;
   }
 
   private protocolViolation(error: unknown): void {
