@@ -38,6 +38,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class LupaSession implements WebSocketEndpoint {
     private static final Set<String> RELEASE_STATUSES = Set.of("displayed", "discarded", "failed");
     private static final boolean I21_DIAGNOSTICS = Boolean.getBoolean("lupa.i21.diag");
+    private static final int DRR_DIAGNOSTIC_READ_DELAY_MS =
+            readDiagnosticDelayMs();
     private static final AtomicInteger SESSION_IDS = new AtomicInteger();
     private static final int MAX_TILE_ENVELOPE_BYTES =
             4 + 4096 + LupaProtocol.MAX_TILE_BYTES;
@@ -1224,6 +1226,7 @@ public final class LupaSession implements WebSocketEndpoint {
                 TileReadException failure = null;
                 int actualCompressedBytes = 0;
                 try {
+                    applyDiagnosticReadDelay();
                     tile = tileReader.read(
                             imageAtRead,
                             ref.z(),
@@ -1886,6 +1889,50 @@ public final class LupaSession implements WebSocketEndpoint {
             state = LupaSessionState.CERRADA;
             sender.close(1011, "server session queue is full");
         }
+    }
+
+    private void applyDiagnosticReadDelay()
+            throws TileReadException {
+        if (!I21_DIAGNOSTICS
+                || DRR_DIAGNOSTIC_READ_DELAY_MS == 0) {
+            return;
+        }
+
+        diagnostic(
+                "DRR_READ_DELAY",
+                "ms=" + DRR_DIAGNOSTIC_READ_DELAY_MS);
+
+        try {
+            Thread.sleep(DRR_DIAGNOSTIC_READ_DELAY_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new TileReadException(
+                    "diagnostic DRR read delay interrupted",
+                    e);
+        }
+    }
+
+    private static int readDiagnosticDelayMs() {
+        String raw =
+                System.getProperty(
+                        "lupa.drr.diag.readDelayMs",
+                        "0");
+
+        final int value;
+        try {
+            value = Integer.parseInt(raw);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "lupa.drr.diag.readDelayMs must be an integer",
+                    e);
+        }
+
+        if (value < 0 || value > 2000) {
+            throw new IllegalArgumentException(
+                    "lupa.drr.diag.readDelayMs must be between 0 and 2000");
+        }
+
+        return value;
     }
 
     private void diagnostic(String event, String detail) {

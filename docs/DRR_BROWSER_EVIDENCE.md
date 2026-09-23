@@ -16,6 +16,7 @@ cd /home/erwin/PRJIMA
 
 java \
   -Dlupa.i21.diag=true \
+  -Dlupa.drr.diag.readDelayMs=100 \
   -jar target/lupa.jar \
   --host=127.0.0.1 \
   --port=8081 \
@@ -24,7 +25,10 @@ java \
   --drr-quantum-bytes=8192
 ```
 
-El servidor imprime eventos `TURN` y `DRR_CHARGE` por sesión.
+El servidor imprime eventos `TURN`, `DRR_READ_DELAY` y `DRR_CHARGE` por
+sesión. El delay diagnóstico se ejecuta dentro del worker de disco, después de
+adquirir el turno DRR; nunca bloquea callbacks de red. Está desactivado por defecto
+y acepta 0..2000 ms.
 
 ## Frontend
 
@@ -38,11 +42,13 @@ npm run dev
 Abrir dos ventanas o perfiles de navegador distintos:
 
 ```text
-http://127.0.0.1:5173/?i21DecodeDelayMs=80
-http://127.0.0.1:5173/?i21DecodeDelayMs=80
+http://127.0.0.1:5173/
+http://127.0.0.1:5173/
 ```
 
-El delay solo ayuda a que ambas sesiones permanezcan activas al mismo tiempo.
+El solapamiento se fuerza en el servidor mediante
+`-Dlupa.drr.diag.readDelayMs=100`, por lo que no es necesario retrasar el decode
+del navegador.
 
 ## Procedimiento
 
@@ -58,6 +64,7 @@ Una forma simple:
 # en lugar del comando anterior, si se quiere conservar evidencia:
 java \
   -Dlupa.i21.diag=true \
+  -Dlupa.drr.diag.readDelayMs=100 \
   -jar target/lupa.jar \
   --host=127.0.0.1 \
   --port=8081 \
@@ -70,7 +77,7 @@ java \
 Después extraer solo los eventos relevantes:
 
 ```bash
-grep -E 'event=(OPEN|TURN|DRR_CHARGE|CLOSE)' drr-real-browser.log \
+grep -E 'event=(OPEN|TURN|DRR_READ_DELAY|DRR_CHARGE|CLOSE)' drr-real-browser.log \
   > drr-real-browser-evidence.txt
 ```
 
