@@ -30,6 +30,7 @@ public record ServerConfig(
         long tileCacheBytes,
         long transientTileBytes,
         int maxTileReads,
+        int drrQuantumBytes,
         Duration helloTimeout,
         Duration pingInterval,
         Duration pongTimeout,
@@ -103,6 +104,7 @@ public record ServerConfig(
                 128L * 1024L * 1024L,
                 16L * 1024L * 1024L,
                 8,
+                128 * 1024,
                 Duration.ofSeconds(5),
                 Duration.ofSeconds(15),
                 Duration.ofSeconds(10),
@@ -142,7 +144,8 @@ public record ServerConfig(
                 || diskQueueCapacity < 1
                 || metadataThreads < 1
                 || metadataQueueCapacity < 1
-                || maxTileReads < 1) {
+                || maxTileReads < 1
+                || drrQuantumBytes < 1) {
             throw new IllegalArgumentException(
                     "thread/queue/connection/session limits must be positive");
         }
@@ -168,6 +171,11 @@ public record ServerConfig(
         requirePositive(
                 writeProgressTimeout,
                 "writeProgressTimeout");
+
+        if (drrQuantumBytes > 262_144) {
+            throw new IllegalArgumentException(
+                    "drrQuantumBytes cannot exceed maximum TILE payload bytes");
+        }
 
         if (tileCacheBytes < 262_144L) {
             throw new IllegalArgumentException(
@@ -244,6 +252,7 @@ public record ServerConfig(
                 128L * 1024L * 1024L,
                 16L * 1024L * 1024L,
                 8,
+                128 * 1024,
                 Duration.ofSeconds(5),
                 Duration.ofSeconds(15),
                 Duration.ofSeconds(10),
@@ -306,6 +315,7 @@ public record ServerConfig(
                         "tile-cache-bytes",
                         "transient-tile-bytes",
                         "max-tile-reads",
+                        "drr-quantum-bytes",
                         "hello-timeout-ms",
                         "ping-interval-ms",
                         "pong-timeout-ms",
@@ -436,6 +446,10 @@ public record ServerConfig(
                         values,
                         "max-tile-reads",
                         defaults.maxTileReads()),
+                parseInt(
+                        values,
+                        "drr-quantum-bytes",
+                        defaults.drrQuantumBytes()),
                 Duration.ofMillis(
                         parseInt(
                                 values,

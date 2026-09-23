@@ -44,6 +44,7 @@ class ServerConfigTest {
                 16L * 1024L * 1024L,
                 config.transientTileBytes());
         assertEquals(8, config.maxTileReads());
+        assertEquals(128 * 1024, config.drrQuantumBytes());
 
         assertEquals(5000, config.helloTimeout().toMillis());
         assertEquals(15000, config.pingInterval().toMillis());
@@ -73,6 +74,7 @@ class ServerConfigTest {
                                 "--tile-cache-bytes=1048576",
                                 "--transient-tile-bytes=4000000",
                                 "--max-tile-reads=4",
+                                "--drr-quantum-bytes=65536",
                                 "--hello-timeout-ms=800",
                                 "--ping-interval-ms=900",
                                 "--pong-timeout-ms=300",
@@ -96,6 +98,7 @@ class ServerConfigTest {
         assertEquals(1048576L, config.tileCacheBytes());
         assertEquals(4000000L, config.transientTileBytes());
         assertEquals(4, config.maxTileReads());
+        assertEquals(65536, config.drrQuantumBytes());
 
         assertEquals(800, config.helloTimeout().toMillis());
         assertEquals(900, config.pingInterval().toMillis());
@@ -149,6 +152,23 @@ class ServerConfigTest {
                                 "--disk-threads=1",
                                 "--disk-queue-capacity=1",
                                 "--max-tile-reads=3"
+                        }));
+    }
+
+    @Test
+    void invalidDrrQuantumIsRejected() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ServerConfig.fromArgs(
+                        new String[]{
+                                "--drr-quantum-bytes=0"
+                        }));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ServerConfig.fromArgs(
+                        new String[]{
+                                "--drr-quantum-bytes=262145"
                         }));
     }
 

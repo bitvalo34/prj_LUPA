@@ -1222,12 +1222,15 @@ public final class LupaSession implements WebSocketEndpoint {
             diskExecutor.execute(() -> {
                 TileData tile = null;
                 TileReadException failure = null;
+                int actualCompressedBytes = 0;
                 try {
                     tile = tileReader.read(
                             imageAtRead,
                             ref.z(),
                             ref.x(),
                             ref.y());
+                    actualCompressedBytes =
+                            tile.jpegLength();
                 } catch (TileReadException e) {
                     failure = e;
                 } catch (RuntimeException e) {
@@ -1235,7 +1238,10 @@ public final class LupaSession implements WebSocketEndpoint {
                             "unexpected tile read failure",
                             e);
                 } finally {
-                    if (readLease != null) readLease.close();
+                    if (readLease != null) {
+                        readLease.complete(
+                                actualCompressedBytes);
+                    }
                 }
 
                 TileData resultTile = tile;

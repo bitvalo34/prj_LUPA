@@ -73,7 +73,8 @@ public final class LupaApplication {
         TileReadAdmission tileReadAdmission =
                 new TileReadAdmission(
                         config.maxTileReads(),
-                        config.maxSessions());
+                        config.maxSessions(),
+                        config.drrQuantumBytes());
 
         TransientBufferBudget transientBuffers =
                 new TransientBufferBudget(
@@ -146,7 +147,7 @@ public final class LupaApplication {
                         + "(catalog=%s, dataRoot=%s, "
                         + "connections=%d, websockets=%d, sessions=%d, "
                         + "disk=%dx%d, metadata=%dx%d, tileReads=%d, "
-                        + "cacheBytes=%d, transientBytes=%d, "
+                        + "drrQuantumBytes=%d, cacheBytes=%d, transientBytes=%d, "
                         + "helloMs=%d, pingMs=%d, pongMs=%d, "
                         + "releaseMs=%d, writeProgressMs=%d)%n",
                 config.host(),
@@ -161,6 +162,7 @@ public final class LupaApplication {
                 config.metadataThreads(),
                 config.metadataQueueCapacity(),
                 config.maxTileReads(),
+                config.drrQuantumBytes(),
                 config.tileCacheBytes(),
                 config.transientTileBytes(),
                 config.helloTimeout().toMillis(),
