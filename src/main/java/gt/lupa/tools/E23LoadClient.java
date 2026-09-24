@@ -233,6 +233,7 @@ public final class E23LoadClient {
         private long obsoleteJpegBytes;
         private final AtomicLong releasesSent = new AtomicLong();
         private final AtomicLong asyncReleaseErrors = new AtomicLong();
+        private final Object releaseSendLock = new Object();
         private long errors;
 
         private ClientSession(
@@ -408,7 +409,8 @@ public final class E23LoadClient {
                 }
             }
 
-            boolean ok = failure.isBlank() && errors == 0;
+            long totalErrors = errors + asyncReleaseErrors.get();
+            boolean ok = failure.isBlank() && totalErrors == 0;
             return new ClientResult(
                     clientId,
                     ok,
@@ -424,7 +426,7 @@ public final class E23LoadClient {
                     obsoleteTiles,
                     obsoleteJpegBytes,
                     releasesSent.get(),
-                    errors + asyncReleaseErrors.get());
+                    totalErrors);
         }
 
         private void signalReady() {
@@ -560,31 +562,31 @@ public final class E23LoadClient {
             pendingReleases.incrementAndGet();
             releases.schedule(
                     () -> {
+                        String release = MAPPER.createObjectNode()
+                                .put("type", "RELEASE")
+                                .put("deliveryId", tile.deliveryId())
+                                .put("status", "discarded")
+                                .toString();
+                        byte[] releaseBytes = release.getBytes(StandardCharsets.UTF_8);
                         try {
-                            String release = MAPPER.createObjectNode()
-                                    .put("type", "RELEASE")
-                                    .put("deliveryId", tile.deliveryId())
-                                    .put("status", "discarded")
-                                    .toString();
-                            byte[] releaseBytes = release.getBytes(StandardCharsets.UTF_8);
+                            synchronized (releaseSendLock) {
+                                socket.sendText(release, true)
+                                        .join();
+                            }
                             controlBytesOut.addAndGet(releaseBytes.length);
-                            socket.sendText(release, true)
-                                    .whenComplete((ignored, failure) -> {
-                                        if (failure != null) {
-                                            asyncReleaseErrors.incrementAndGet();
-                                            log.event(clientId, "RELEASE_SEND_ERROR", out -> {
-                                                out.put("deliveryId", tile.deliveryId());
-                                                out.put("epoch", tile.epoch());
-                                                out.put("message", failure.toString());
-                                            });
-                                        }
-                                    });
                             releasesSent.incrementAndGet();
                             log.event(clientId, "RELEASE_SENT", out -> {
                                 out.put("deliveryId", tile.deliveryId());
                                 out.put("epoch", tile.epoch());
                                 out.put("status", "discarded");
                                 out.put("delayMs", delayMs);
+                            });
+                        } catch (RuntimeException failure) {
+                            asyncReleaseErrors.incrementAndGet();
+                            log.event(clientId, "RELEASE_SEND_ERROR", out -> {
+                                out.put("deliveryId", tile.deliveryId());
+                                out.put("epoch", tile.epoch());
+                                out.put("message", failure.toString());
                             });
                         } finally {
                             pendingReleases.decrementAndGet();
