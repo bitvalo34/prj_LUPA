@@ -110,6 +110,47 @@ class ServerConfigTest {
     }
 
     @Test
+    void e23ReducedLimitsRemainCoherentForControlledSaturationTests() {
+        ServerConfig config =
+                ServerConfig.fromArgs(
+                        new String[]{
+                                "--max-connections=4",
+                                "--max-ws-connections=2",
+                                "--max-sessions=2",
+                                "--worker-threads=1",
+                                "--worker-queue-capacity=2",
+                                "--io-threads=1",
+                                "--disk-threads=1",
+                                "--disk-queue-capacity=1",
+                                "--metadata-threads=1",
+                                "--metadata-queue-capacity=1",
+                                "--max-tile-reads=1",
+                                "--drr-quantum-bytes=32768",
+                                "--tile-cache-bytes=262144",
+                                "--transient-tile-bytes=600000",
+                                "--header-timeout-ms=150",
+                                "--hello-timeout-ms=150",
+                                "--ping-interval-ms=150",
+                                "--pong-timeout-ms=100",
+                                "--release-timeout-ms=200",
+                                "--write-progress-timeout-ms=150",
+                                "--ws-close-timeout-ms=100"
+                        });
+
+        assertEquals(4, config.maxConnections());
+        assertEquals(2, config.maxWebSocketConnections());
+        assertEquals(2, config.maxSessions());
+        assertEquals(1, config.diskThreads());
+        assertEquals(1, config.diskQueueCapacity());
+        assertEquals(1, config.maxTileReads());
+        assertEquals(32768, config.drrQuantumBytes());
+        assertEquals(262144L, config.tileCacheBytes());
+        assertEquals(600000L, config.transientTileBytes());
+        assertEquals(150, config.headerTimeout().toMillis());
+        assertEquals(200, config.releaseTimeout().toMillis());
+    }
+
+    @Test
     void incoherentAdmissionLimitsAreRejected() {
         assertThrows(
                 IllegalArgumentException.class,
