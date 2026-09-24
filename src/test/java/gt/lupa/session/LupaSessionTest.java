@@ -413,6 +413,85 @@ class LupaSessionTest {
     }
 
     @Test
+    void experimentalNoCancellationQueuesNewViewWithoutCancellingActiveDelivery() throws Exception {
+        String previousMode = System.getProperty("lupa.e23.experimentalNoCancellation");
+        String previousLimit = System.getProperty("lupa.e23.experimentalPlanQueue");
+        System.setProperty("lupa.e23.experimentalNoCancellation", "true");
+        System.setProperty("lupa.e23.experimentalPlanQueue", "2");
+        try {
+            LupaSession session = new LupaSession(
+                    publishedImage(), fakeTileReader(262_000), Runnable::run);
+            ControlledSender sender = new ControlledSender(HoldMode.BEFORE_COMMIT);
+            session.onOpen(sender);
+
+            hello(session, sender, 524288);
+            session.onText(sender, "{\"type\":\"OPEN\",\"epoch\":1,\"imageId\":\"photo\"}");
+            session.onText(sender, view(2));
+
+            assertNotNull(sender.firstSend);
+            assertFalse(sender.firstSend.committed());
+            assertFalse(sender.firstSend.cancelled);
+            assertEquals(2, session.snapshotForTest().activePlanEpoch());
+            assertTrue(session.snapshotForTest().experimentalNoCancellation());
+            assertEquals(0, session.snapshotForTest().experimentalQueuedPlans());
+
+            session.onText(sender, view(3));
+
+            assertFalse(sender.firstSend.cancelled,
+                    "experimental baseline must keep the accepted older plan alive");
+            assertEquals(2, session.snapshotForTest().activePlanEpoch());
+            assertEquals(1, session.snapshotForTest().experimentalQueuedPlans());
+            assertEquals(3, session.snapshotForTest().currentEpoch());
+            assertCreditInvariant(session);
+            assertNull(sender.closeCode);
+        } finally {
+            restoreProperty("lupa.e23.experimentalNoCancellation", previousMode);
+            restoreProperty("lupa.e23.experimentalPlanQueue", previousLimit);
+        }
+    }
+
+    @Test
+    void experimentalNoCancellationRejectsOverflowWithoutDroppingQueuedPlans() throws Exception {
+        String previousMode = System.getProperty("lupa.e23.experimentalNoCancellation");
+        String previousLimit = System.getProperty("lupa.e23.experimentalPlanQueue");
+        System.setProperty("lupa.e23.experimentalNoCancellation", "true");
+        System.setProperty("lupa.e23.experimentalPlanQueue", "1");
+        try {
+            LupaSession session = new LupaSession(
+                    publishedImage(), fakeTileReader(262_000), Runnable::run);
+            ControlledSender sender = new ControlledSender(HoldMode.BEFORE_COMMIT);
+            session.onOpen(sender);
+
+            hello(session, sender, 524288);
+            session.onText(sender, "{\"type\":\"OPEN\",\"epoch\":1,\"imageId\":\"photo\"}");
+            session.onText(sender, view(2));
+            session.onText(sender, view(3));
+            session.onText(sender, view(4));
+
+            assertEquals(2, session.snapshotForTest().activePlanEpoch());
+            assertEquals(1, session.snapshotForTest().experimentalQueuedPlans());
+            assertEquals(3, session.snapshotForTest().currentEpoch(),
+                    "overflowing VIEW must not consume the accepted epoch");
+            assertTrue(sender.texts.stream().anyMatch(text -> {
+                try {
+                    JsonNode node = mapper.readTree(text);
+                    return "ERROR".equals(node.path("type").asText())
+                            && node.path("epoch").asInt() == 4
+                            && "LIMIT_EXCEEDED".equals(node.path("code").asText());
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }));
+            assertFalse(sender.firstSend.cancelled);
+            assertCreditInvariant(session);
+            assertNull(sender.closeCode);
+        } finally {
+            restoreProperty("lupa.e23.experimentalNoCancellation", previousMode);
+            restoreProperty("lupa.e23.experimentalPlanQueue", previousLimit);
+        }
+    }
+
+    @Test
     void newViewCancelsReservedButUncommittedTileAndDoesNotReuseDeliveryId() throws Exception {
         LupaSession session = new LupaSession(
                 publishedImage(), fakeTileReader(262_000), Runnable::run);
@@ -665,6 +744,14 @@ class LupaSessionTest {
                 """);
         assertEquals("MANIFEST", sender.lastJson().get("type").asText());
         assertNull(sender.closeCode);
+    }
+
+    private static void restoreProperty(String name, String value) {
+        if (value == null) {
+            System.clearProperty(name);
+        } else {
+            System.setProperty(name, value);
+        }
     }
 
     private void hello(LupaSession session, WebSocketEndpoint.Sender sender, int windowBytes) {
