@@ -225,13 +225,14 @@ public final class E23LoadClient {
         private boolean readySignalled;
         private int latestEpoch = 1;
         private long controlBytesIn;
-        private long controlBytesOut;
+        private final AtomicLong controlBytesOut = new AtomicLong();
         private long tiles;
         private long jpegBytes;
         private long lupaBinaryBytes;
         private long obsoleteTiles;
         private long obsoleteJpegBytes;
-        private long releasesSent;
+        private final AtomicLong releasesSent = new AtomicLong();
+        private final AtomicLong asyncReleaseErrors = new AtomicLong();
         private long errors;
 
         private ClientSession(
@@ -269,8 +270,9 @@ public final class E23LoadClient {
                     throw new IllegalStateException(
                             "server did not select lupa.v1: " + socket.getSubprotocol());
                 }
+                String selectedSubprotocol = socket.getSubprotocol();
                 log.event(clientId, "WS_OPEN", node ->
-                        node.put("subprotocol", socket.getSubprotocol()));
+                        node.put("subprotocol", selectedSubprotocol));
 
                 sendText(socket, MAPPER.createObjectNode()
                         .put("type", "HELLO")
@@ -415,14 +417,14 @@ public final class E23LoadClient {
                     imageVersion,
                     List.copyOf(views.values()),
                     controlBytesIn,
-                    controlBytesOut,
+                    controlBytesOut.get(),
                     tiles,
                     jpegBytes,
                     lupaBinaryBytes,
                     obsoleteTiles,
                     obsoleteJpegBytes,
-                    releasesSent,
-                    errors);
+                    releasesSent.get(),
+                    errors + asyncReleaseErrors.get());
         }
 
         private void signalReady() {
@@ -564,9 +566,20 @@ public final class E23LoadClient {
                                     .put("deliveryId", tile.deliveryId())
                                     .put("status", "discarded")
                                     .toString();
-                            socket.sendText(release, true);
-                            controlBytesOut += release.getBytes(StandardCharsets.UTF_8).length;
-                            releasesSent++;
+                            byte[] releaseBytes = release.getBytes(StandardCharsets.UTF_8);
+                            controlBytesOut.addAndGet(releaseBytes.length);
+                            socket.sendText(release, true)
+                                    .whenComplete((ignored, failure) -> {
+                                        if (failure != null) {
+                                            asyncReleaseErrors.incrementAndGet();
+                                            log.event(clientId, "RELEASE_SEND_ERROR", out -> {
+                                                out.put("deliveryId", tile.deliveryId());
+                                                out.put("epoch", tile.epoch());
+                                                out.put("message", failure.toString());
+                                            });
+                                        }
+                                    });
+                            releasesSent.incrementAndGet();
                             log.event(clientId, "RELEASE_SENT", out -> {
                                 out.put("deliveryId", tile.deliveryId());
                                 out.put("epoch", tile.epoch());
@@ -594,7 +607,7 @@ public final class E23LoadClient {
                 String type,
                 int epoch) throws Exception {
             byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
-            controlBytesOut += bytes.length;
+            controlBytesOut.addAndGet(bytes.length);
             socket.sendText(text, true)
                     .get(config.sendTimeoutMs(), TimeUnit.MILLISECONDS);
             log.event(clientId, "CONTROL_SENT", node -> {
