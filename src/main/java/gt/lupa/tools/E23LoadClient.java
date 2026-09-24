@@ -64,6 +64,7 @@ public final class E23LoadClient {
                 ? "e23-" + RUN_TIME.format(Instant.now())
                         + "-c" + config.clients()
                         + "-" + config.scenario()
+                        + "-" + config.experimentMode()
                         + "-s" + config.seed()
                 : config.runId();
 
@@ -88,6 +89,7 @@ public final class E23LoadClient {
                 node.put("subprotocol", "lupa.v1");
                 node.put("clients", config.clients());
                 node.put("scenario", config.scenario());
+                node.put("mode", config.experimentMode());
                 node.put("imageId", config.imageId());
                 node.put("operations", config.operations());
                 node.put("viewIntervalMs", config.viewIntervalMs());
@@ -1049,7 +1051,7 @@ public final class E23LoadClient {
             root.put("schemaVersion", 1);
             root.put("runId", runId);
             root.put("commit", System.getProperty("e23.commit", "unknown"));
-            root.put("mode", "normal");
+            root.put("mode", config.experimentMode());
             root.put("configuredClients", configuredClients);
             root.put("successfulClients", successfulClients);
             root.put("failedClients", failedClients);
@@ -1160,6 +1162,7 @@ public final class E23LoadClient {
             long settleMs,
             int detailOffset,
             String jpegValidation,
+            String experimentMode,
             Path outputDir,
             String runId) {
 
@@ -1202,6 +1205,7 @@ public final class E23LoadClient {
                     number(properties, "settleMs", 200),
                     integer(properties, "detailOffset", 0),
                     value(properties, "jpegValidation", "structural").toLowerCase(Locale.ROOT),
+                    value(properties, "experimentMode", "normal").toLowerCase(Locale.ROOT),
                     Path.of(value(properties, "outputDir", "results/e23")),
                     value(properties, "runId", ""));
 
@@ -1220,9 +1224,9 @@ public final class E23LoadClient {
             if (imageId.isBlank()) {
                 throw new IllegalArgumentException("imageId is required");
             }
-            if (!List.of("stable", "movement", "focus", "slow").contains(scenario)) {
+            if (!List.of("stable", "movement", "focus", "slow", "aggressive").contains(scenario)) {
                 throw new IllegalArgumentException(
-                        "scenario must be stable, movement, focus or slow");
+                        "scenario must be stable, movement, focus, slow or aggressive");
             }
             if (operations < 1 || operations > 100) {
                 throw new IllegalArgumentException("operations must be 1..100");
@@ -1249,6 +1253,10 @@ public final class E23LoadClient {
                 throw new IllegalArgumentException(
                         "jpegValidation must be structural or decode");
             }
+            if (!List.of("normal", "no-cancel").contains(experimentMode)) {
+                throw new IllegalArgumentException(
+                        "experimentMode must be normal or no-cancel");
+            }
         }
 
         void writeJson(ObjectNode node) {
@@ -1269,6 +1277,7 @@ public final class E23LoadClient {
             node.put("settleMs", settleMs);
             node.put("detailOffset", detailOffset);
             node.put("jpegValidation", jpegValidation);
+            node.put("experimentMode", experimentMode);
             node.put("outputDir", outputDir.toString());
             node.put("runId", runId);
             node.put("releaseStatus", "discarded");
