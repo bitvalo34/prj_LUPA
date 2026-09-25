@@ -235,7 +235,9 @@ public final class E23LoadClient {
         private long obsoleteJpegBytes;
         private final AtomicLong releasesSent = new AtomicLong();
         private final AtomicLong asyncReleaseErrors = new AtomicLong();
-        private final Object releaseSendLock = new Object();
+        // Java's WebSocket client permits only one pending send per connection.
+        // Serialize every outbound text message (HELLO/OPEN/VIEW/RELEASE) per client.
+        private final Object outboundSendLock = new Object();
         private long errors;
 
         private ClientSession(
@@ -571,7 +573,7 @@ public final class E23LoadClient {
                                 .toString();
                         byte[] releaseBytes = release.getBytes(StandardCharsets.UTF_8);
                         try {
-                            synchronized (releaseSendLock) {
+                            synchronized (outboundSendLock) {
                                 socket.sendText(release, true)
                                         .join();
                             }
@@ -611,9 +613,11 @@ public final class E23LoadClient {
                 String type,
                 int epoch) throws Exception {
             byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+            synchronized (outboundSendLock) {
+                socket.sendText(text, true)
+                        .get(config.sendTimeoutMs(), TimeUnit.MILLISECONDS);
+            }
             controlBytesOut.addAndGet(bytes.length);
-            socket.sendText(text, true)
-                    .get(config.sendTimeoutMs(), TimeUnit.MILLISECONDS);
             log.event(clientId, "CONTROL_SENT", node -> {
                 node.put("type", type);
                 node.put("epoch", epoch);
