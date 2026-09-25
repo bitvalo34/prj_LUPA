@@ -133,4 +133,9 @@ python3 scripts/e24/summarize-campaign.py "$CAMPAIGN_DIR"
 
 echo
 echo "E24 campaign prepared/executed: $CAMPAIGN_DIR"
-echo "Cold means a fresh LUPA JVM/application cache. It does NOT flush the OS page cache."
+if [[ "$CACHE" == "cold" ]]; then
+  echo "CACHE=cold: each measured repetition uses a fresh LUPA JVM/application cache."
+else
+  echo "CACHE=warm: one persistent LUPA JVM is warmed by one unmeasured run before measured repetitions."
+fi
+echo "The OS page cache is not flushed in either condition."
