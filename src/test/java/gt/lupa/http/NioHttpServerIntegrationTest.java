@@ -51,6 +51,27 @@ class NioHttpServerIntegrationTest {
     @Test void invalidRoutesMethodsPrivatePathsAndReservedLupaAreExplicit()throws Exception{assertEquals(404,request("GET /missing HTTP/1.1\r\nHost: localhost\r\n\r\n").status);RawResponse method=request("POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n");assertEquals(405,method.status);assertEquals("GET, HEAD",method.header("allow"));assertEquals(404,request("GET /data/originals/secret.jpg HTTP/1.1\r\nHost: localhost\r\n\r\n").status);assertEquals(404,request("GET /.git/config HTTP/1.1\r\nHost: localhost\r\n\r\n").status);assertEquals(426,request("GET /lupa HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\n\r\n").status);}
     @Test void rejectsHostFramingTraversalEncodingAndOversizedHeaders()throws Exception{assertEquals(400,request("GET / HTTP/1.1\r\n\r\n").status);assertEquals(400,request("GET / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 1\r\n\r\n").status);assertEquals(400,request("GET / HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n").status);assertEquals(400,request("GET /%2e%2e/secret HTTP/1.1\r\nHost: localhost\r\n\r\n").status);assertEquals(400,request("GET /%ZZ HTTP/1.1\r\nHost: localhost\r\n\r\n").status);String huge="GET / HTTP/1.1\r\nHost: localhost\r\nX-Huge: "+"a".repeat(17000)+"\r\n\r\n";assertEquals(431,request(huge).status);}
     @Test void fragmentedHeadersCompleteAcrossTerminatorBoundary()throws Exception{try(Socket socket=connect()){socket.getOutputStream().write("GET /api/catalog HTTP/1.1\r\nHost: local".getBytes(StandardCharsets.ISO_8859_1));socket.getOutputStream().flush();socket.getOutputStream().write("host\r\nX: y\r\n\r".getBytes(StandardCharsets.ISO_8859_1));socket.getOutputStream().flush();socket.getOutputStream().write("\n".getBytes(StandardCharsets.ISO_8859_1));socket.getOutputStream().flush();assertEquals(200,RawResponse.parse(readAll(socket)).status);}}
+    @Test
+    void eofBeforeCompleteHeadersReturns400AndServerKeepsAccepting() throws Exception {
+        try (Socket socket = connect()) {
+            socket.getOutputStream().write(
+                    "GET / HTTP/1.1\r\nHost: localhost\r\nX-Test:"
+                            .getBytes(StandardCharsets.ISO_8859_1));
+            socket.getOutputStream().flush();
+
+            // Half-close only the client-to-server direction so the response
+            // can still be observed deterministically.
+            socket.shutdownOutput();
+
+            RawResponse response = RawResponse.parse(readAll(socket));
+            assertEquals(400, response.status);
+        }
+
+        assertEquals(
+                200,
+                request("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n").status,
+                "an incomplete client must not damage the accept loop");
+    }
     @Test void oneIncompleteClientDoesNotBlockAnotherAndTimeoutIsBounded()throws Exception{try(Socket slow=connect()){slow.getOutputStream().write("GET / HTTP/1.1\r\nHost: localhost\r\n".getBytes(StandardCharsets.ISO_8859_1));slow.getOutputStream().flush();assertEquals(200,request("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n").status);assertEquals(408,RawResponse.parse(readAll(slow)).status);}}
     @Test void disconnectsAndPipelinedInputDoNotBreakAcceptLoopOrProduceSecondResponse()throws Exception{try(Socket abandoned=connect()){abandoned.getOutputStream().write("GET / HTTP/1.1\r\nHost:".getBytes(StandardCharsets.ISO_8859_1));}assertEquals(200,request("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n").status);String two="GET / HTTP/1.1\r\nHost: localhost\r\n\r\nGET /api/catalog HTTP/1.1\r\nHost: localhost\r\n\r\n";byte[] bytes=exchange(two);String wire=new String(bytes,StandardCharsets.ISO_8859_1);assertEquals(1,occurrences(wire,"HTTP/1.1 "));assertTrue(wire.startsWith("HTTP/1.1 200")||wire.startsWith("HTTP/1.1 400"));assertEquals(200,request("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n").status);}
     private static String assetPath(String html,String prefix,String suffix){

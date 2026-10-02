@@ -25,6 +25,7 @@ import gt.lupa.websocket.WebSocketEndpoint;
 
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -55,6 +56,9 @@ public final class LupaSession implements WebSocketEndpoint {
     private final MonotonicScheduler scheduler;
     private final Duration helloTimeout;
     private final Duration releaseTimeout;
+    private final boolean experimentalNoCancellation;
+    private final int experimentalPlanQueueLimit;
+    private final ArrayDeque<ActivePlan> experimentalPlanQueue = new ArrayDeque<>();
     private final SerialExecutor serial;
     private E22Metrics metrics = new E22Metrics();
     private final LupaJson json = new LupaJson();
@@ -270,6 +274,9 @@ public final class LupaSession implements WebSocketEndpoint {
         this.scheduler = scheduler;
         this.helloTimeout = helloTimeout;
         this.releaseTimeout = releaseTimeout;
+        this.experimentalNoCancellation =
+                Boolean.getBoolean("lupa.e23.experimentalNoCancellation");
+        this.experimentalPlanQueueLimit = readExperimentalPlanQueueLimit();
         this.serial = new SerialExecutor(Objects.requireNonNull(stateExecutor));
         this.deliveryIds = Objects.requireNonNull(deliveryIds);
     }
@@ -309,6 +316,7 @@ public final class LupaSession implements WebSocketEndpoint {
                 ActivePlan closingPlan = activePlan;
                 activePlan = null;
                 discardPlanResources(closingPlan);
+                discardExperimentalQueuedPlans();
                 diagnosticCredits("CLOSE", null, "code=" + code + " reason=" + boundedMessage(reason));
                 deliveries.clear();
                 freeWindowBytes = 0;
@@ -544,14 +552,34 @@ public final class LupaSession implements WebSocketEndpoint {
             return;
         }
 
-        invalidatePlan();
+        if (experimentalNoCancellation
+                && activePlan != null
+                && experimentalPlanQueue.size() >= experimentalPlanQueueLimit) {
+            sendError(
+                    sender,
+                    epoch,
+                    LupaProtocol.ErrorCode.LIMIT_EXCEEDED,
+                    "experimental no-cancellation plan queue is full");
+            return;
+        }
+
+        if (!experimentalNoCancellation) {
+            invalidatePlan();
+        }
+
         currentEpoch = epoch;
         long generation = ++planGeneration;
-        activePlan = new ActivePlan(
+        ActivePlan acceptedPlan = new ActivePlan(
                 generation,
                 request,
                 selected,
                 new PlannedTileCursor(selected));
+
+        if (experimentalNoCancellation && activePlan != null) {
+            experimentalPlanQueue.addLast(acceptedPlan);
+        } else {
+            activePlan = acceptedPlan;
+        }
 
         ObjectNode planControl = json.mapper().createObjectNode();
         planControl.put("type", "PLAN");
@@ -566,7 +594,7 @@ public final class LupaSession implements WebSocketEndpoint {
                         + " context=" + selected.contextLevel()
                         + " rect=" + request.rect().x() + "," + request.rect().y()
                         + "," + request.rect().width() + "x" + request.rect().height());
-        sendPlanControl(activePlan, planControl);
+        sendPlanControl(acceptedPlan, planControl);
     }
 
     private void sendPlanControl(ActivePlan plan, ObjectNode control) {
@@ -584,7 +612,7 @@ public final class LupaSession implements WebSocketEndpoint {
                 () -> {});
         plan.planWrite = write;
         if (!write.accepted()) {
-            activePlan = null;
+            removePlan(plan);
             closed.set(true);
             state = LupaSessionState.CERRADA;
             sender.close(1011, "WebSocket write queue is full");
@@ -592,13 +620,15 @@ public final class LupaSession implements WebSocketEndpoint {
     }
 
     private void onPlanCommitted(long generation) {
-        ActivePlan plan = activePlan;
-        if (plan == null || plan.generation != generation) {
+        ActivePlan plan = findPlan(generation);
+        if (plan == null) {
             metrics.recordLateCallbackDiscarded();
             return;
         }
         plan.planCommitted = true;
-        pump();
+        if (plan == activePlan) {
+            pump();
+        }
     }
 
     private void sendDoneControl(ActivePlan plan, ObjectNode control) {
@@ -629,6 +659,7 @@ public final class LupaSession implements WebSocketEndpoint {
         diagnosticCredits("DONE", null,
                 "epoch=" + plan.view.epoch() + " sentTiles=" + plan.sentTiles);
         activePlan = null;
+        promoteExperimentalPlan();
     }
 
     private void handleRelease(Sender sender, ObjectNode control) throws LupaControlException {
@@ -1637,14 +1668,16 @@ public final class LupaSession implements WebSocketEndpoint {
     }
 
     private void failPlan(ActivePlan plan, LupaProtocol.ErrorCode code, String message) {
-        if (activePlan != plan) return;
-        activePlan = null;
+        boolean wasActive = activePlan == plan;
+        if (!wasActive && !experimentalPlanQueue.remove(plan)) return;
+        if (wasActive) activePlan = null;
         planGeneration++;
         discardPlanResources(plan);
         cancelUncommittedControl(plan.planWrite);
         cancelUncommittedControl(plan.doneWrite);
         cancelUncommittedDeliveries(plan.generation);
         sendError(sender, plan.view.epoch(), code, message);
+        if (wasActive) promoteExperimentalPlan();
     }
 
     private void requireNewSession(
@@ -1667,6 +1700,54 @@ public final class LupaSession implements WebSocketEndpoint {
             cancelUncommittedControl(invalidated.planWrite);
             cancelUncommittedControl(invalidated.doneWrite);
             cancelUncommittedDeliveries(invalidated.generation);
+        }
+        while (!experimentalPlanQueue.isEmpty()) {
+            ActivePlan queued = experimentalPlanQueue.removeFirst();
+            discardPlanResources(queued);
+            cancelUncommittedControl(queued.planWrite);
+            cancelUncommittedControl(queued.doneWrite);
+            cancelUncommittedDeliveries(queued.generation);
+        }
+    }
+
+    private ActivePlan findPlan(long generation) {
+        ActivePlan current = activePlan;
+        if (current != null && current.generation == generation) {
+            return current;
+        }
+        for (ActivePlan queued : experimentalPlanQueue) {
+            if (queued.generation == generation) return queued;
+        }
+        return null;
+    }
+
+    private void removePlan(ActivePlan plan) {
+        if (activePlan == plan) {
+            activePlan = null;
+            discardPlanResources(plan);
+            promoteExperimentalPlan();
+            return;
+        }
+        if (experimentalPlanQueue.remove(plan)) {
+            discardPlanResources(plan);
+        }
+    }
+
+    private void promoteExperimentalPlan() {
+        if (!experimentalNoCancellation || activePlan != null) return;
+        activePlan = experimentalPlanQueue.pollFirst();
+        if (activePlan != null) {
+            diagnostic(
+                    "E23_BASELINE_PROMOTE",
+                    "epoch=" + activePlan.view.epoch()
+                            + " queued=" + experimentalPlanQueue.size());
+            pump();
+        }
+    }
+
+    private void discardExperimentalQueuedPlans() {
+        while (!experimentalPlanQueue.isEmpty()) {
+            discardPlanResources(experimentalPlanQueue.removeFirst());
         }
     }
 
@@ -1755,6 +1836,7 @@ public final class LupaSession implements WebSocketEndpoint {
         ActivePlan closingPlan = activePlan;
         activePlan = null;
         discardPlanResources(closingPlan);
+        discardExperimentalQueuedPlans();
 
         cancelAllReleaseTimers();
         releaseAllTransientBuffers();
@@ -1933,6 +2015,26 @@ public final class LupaSession implements WebSocketEndpoint {
         }
     }
 
+    private static int readExperimentalPlanQueueLimit() {
+        String raw =
+                System.getProperty(
+                        "lupa.e23.experimentalPlanQueue",
+                        "16");
+        final int value;
+        try {
+            value = Integer.parseInt(raw);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "lupa.e23.experimentalPlanQueue must be an integer",
+                    e);
+        }
+        if (value < 1 || value > 64) {
+            throw new IllegalArgumentException(
+                    "lupa.e23.experimentalPlanQueue must be between 1 and 64");
+        }
+        return value;
+    }
+
     private static int readDiagnosticDelayMs() {
         String raw =
                 System.getProperty(
@@ -2005,7 +2107,9 @@ public final class LupaSession implements WebSocketEndpoint {
                 deliveryIds.nextValue(),
                 tileTurnsGranted,
                 opened == null ? null : opened.catalogImage().imageId(),
-                activePlan == null ? null : activePlan.view.epoch());
+                activePlan == null ? null : activePlan.view.epoch(),
+                experimentalNoCancellation,
+                experimentalPlanQueue.size());
     }
 
     record SessionSnapshot(
@@ -2018,7 +2122,9 @@ public final class LupaSession implements WebSocketEndpoint {
             long nextDeliveryId,
             long tileTurnsGranted,
             String openedImageId,
-            Integer activePlanEpoch) {}
+            Integer activePlanEpoch,
+            boolean experimentalNoCancellation,
+            int experimentalQueuedPlans) {}
 
     private record AckRange(
             int start,

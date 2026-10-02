@@ -174,6 +174,41 @@ class WebSocketRawIntegrationTest {
     }
 
     @Test
+    void unmaskedClientFrameClosesOnlyThatConnectionAndServerRecovers() throws Exception {
+        startServer();
+
+        try (Socket socket = connect()) {
+            socket.getOutputStream().write(handshakeRequest());
+            socket.getOutputStream().flush();
+            assertTrue(
+                    readHeaders(socket.getInputStream())
+                            .startsWith("HTTP/1.1 101"));
+
+            // FIN + text, payload length zero, deliberately without MASK bit.
+            socket.getOutputStream().write(
+                    new byte[]{(byte) 0x81, 0x00});
+            socket.getOutputStream().flush();
+
+            ServerFrame close =
+                    readServerFrame(socket.getInputStream());
+            assertEquals(0x8, close.opcode());
+            assertEquals(1002, closeCode(close.payload()));
+        }
+
+        try (Socket next = connect()) {
+            next.getOutputStream().write(
+                    "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n"
+                            .getBytes(StandardCharsets.ISO_8859_1));
+            next.getOutputStream().flush();
+
+            assertTrue(
+                    readHeaders(next.getInputStream())
+                            .startsWith("HTTP/1.1 200"),
+                    "one malformed WebSocket must not damage the server");
+        }
+    }
+
+    @Test
     void rawMaskedPingGetsUnmaskedPongWithSamePayload() throws Exception {
         startServer();
         try (Socket socket = connect()) {

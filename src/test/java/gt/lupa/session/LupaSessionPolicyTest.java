@@ -67,6 +67,46 @@ class LupaSessionPolicyTest {
     }
 
     @Test
+    void duplicateJsonFieldAndMissingRequiredHelloFieldAreProtocolErrors() {
+        LupaSession duplicate =
+                new LupaSession(
+                        storeUnchecked(),
+                        reader(1024),
+                        Runnable::run);
+        Sender first = new Sender();
+        duplicate.onOpen(first);
+
+        duplicate.onText(
+                first,
+                "{\"type\":\"HELLO\",\"type\":\"HELLO\","
+                        + "\"version\":1,\"windowBytes\":524288,"
+                        + "\"bitmapBudgetBytes\":67108864}");
+
+        assertEquals(1008, first.closeCode);
+        assertEquals(
+                LupaSessionState.CERRADA,
+                duplicate.snapshotForTest().state());
+
+        LupaSession missing =
+                new LupaSession(
+                        storeUnchecked(),
+                        reader(1024),
+                        Runnable::run);
+        Sender second = new Sender();
+        missing.onOpen(second);
+
+        missing.onText(
+                second,
+                "{\"type\":\"HELLO\",\"version\":1,"
+                        + "\"windowBytes\":524288}");
+
+        assertEquals(1008, second.closeCode);
+        assertEquals(
+                LupaSessionState.CERRADA,
+                missing.snapshotForTest().state());
+    }
+
+    @Test
     void badViewWithHighEpochDoesNotMutateValidSessionOrConsumeEpoch() throws Exception {
         LupaSession session = new LupaSession(store(), reader(1024), Runnable::run);
         Sender sender = new Sender();

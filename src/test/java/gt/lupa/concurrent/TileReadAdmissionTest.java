@@ -63,6 +63,61 @@ class TileReadAdmissionTest {
     }
 
     @Test
+    void queueFullRecoversAfterWaitingTurnDrains() {
+        TileReadAdmission admission =
+                new TileReadAdmission(1, 1);
+
+        TileReadAdmission.AcquireResult first =
+                admission.acquireOrQueue(
+                        1L,
+                        lease -> fail("first owner is granted immediately"));
+        assertTrue(first.grantedImmediately());
+
+        AtomicReference<TileReadAdmission.Lease> secondLease =
+                new AtomicReference<>();
+        TileReadAdmission.AcquireResult second =
+                admission.acquireOrQueue(
+                        2L,
+                        secondLease::set);
+        assertTrue(second.queued());
+
+        TileReadAdmission.AcquireResult rejected =
+                admission.acquireOrQueue(
+                        3L,
+                        lease -> fail("queue-full owner must not be granted"));
+        assertFalse(rejected.accepted());
+        assertEquals(
+                TileReadAdmission.RejectReason.QUEUE_FULL,
+                rejected.rejectReason());
+
+        TileReadAdmission.Snapshot saturated = admission.snapshot();
+        assertEquals(1, saturated.inFlight());
+        assertEquals(1, saturated.waiting());
+        assertEquals(1, saturated.rejected());
+
+        first.lease().close();
+        assertNotNull(secondLease.get());
+        secondLease.get().close();
+
+        TileReadAdmission.Snapshot drained = admission.snapshot();
+        assertEquals(0, drained.inFlight());
+        assertEquals(0, drained.waiting());
+        assertEquals(0, drained.outstandingOwners());
+
+        TileReadAdmission.AcquireResult recovered =
+                admission.acquireOrQueue(
+                        3L,
+                        lease -> fail("recovered grant is immediate"));
+        assertTrue(recovered.grantedImmediately());
+        recovered.lease().close();
+
+        TileReadAdmission.Snapshot finished = admission.snapshot();
+        assertEquals(0, finished.inFlight());
+        assertEquals(0, finished.waiting());
+        assertEquals(0, finished.outstandingOwners());
+    }
+
+    @Test
     void namedOwnersReceiveOneTilePerTurnInFifoOrder() {
         TileReadAdmission admission =
                 new TileReadAdmission(1, 4);

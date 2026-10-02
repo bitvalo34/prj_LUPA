@@ -162,6 +162,88 @@ class LupaSessionFairnessTest {
         active.onClosed(1000, "done");
     }
 
+    @Test
+    void closingCreditBlockedSessionReleasesAdmissionAndReplacementProgresses()
+            throws Exception {
+        PublishedImageStore store = publishedImage();
+        ManualExecutor disk = new ManualExecutor();
+        TileReadAdmission reads = new TileReadAdmission(1, 4);
+        TransientBufferBudget buffers = new TransientBufferBudget(4 * 1024 * 1024);
+        SessionAdmission sessions = new SessionAdmission(2);
+
+        LupaSession slow = session(
+                store,
+                reader("slow", new ArrayList<>(), 140_000),
+                disk,
+                sessions,
+                reads,
+                buffers);
+        LupaSession active = session(
+                store,
+                reader("active", new ArrayList<>(), 20_000),
+                disk,
+                sessions,
+                reads,
+                buffers);
+
+        Sender slowSender = new Sender();
+        Sender activeSender = new Sender();
+        start(slow, slowSender);
+        start(active, activeSender);
+        disk.runAll(100);
+
+        assertEquals(2, sessions.snapshot().active());
+        assertTrue(slow.snapshotForTest().pendingDeliveries() > 0);
+        assertFalse(slowSender.hasType("DONE"));
+        assertTrue(activeSender.hasType("DONE"));
+
+        LupaSession rejected = session(
+                store,
+                reader("rejected", new ArrayList<>(), 20_000),
+                disk,
+                sessions,
+                reads,
+                buffers);
+        Sender rejectedSender = new Sender();
+        rejected.onOpen(rejectedSender);
+        rejected.onText(
+                rejectedSender,
+                "{\"type\":\"HELLO\",\"version\":1,"
+                        + "\"windowBytes\":524288,"
+                        + "\"bitmapBudgetBytes\":67108864}");
+
+        assertTrue(rejectedSender.hasError("LIMIT_EXCEEDED"));
+        assertEquals(1013, rejectedSender.closeCode);
+        assertEquals(2, sessions.snapshot().active());
+
+        slow.onClosed(1006, "credit-blocked client disconnected");
+        assertEquals(1, sessions.snapshot().active(),
+                "disconnect must release the application-session slot");
+
+        LupaSession replacement = session(
+                store,
+                reader("replacement", new ArrayList<>(), 20_000),
+                disk,
+                sessions,
+                reads,
+                buffers);
+        Sender replacementSender = new Sender();
+        start(replacement, replacementSender);
+        disk.runAll(100);
+
+        assertTrue(replacementSender.hasType("WELCOME"));
+        assertTrue(replacementSender.hasType("DONE"),
+                "a new session must progress after saturated client cleanup");
+        assertNull(replacementSender.closeCode);
+        assertEquals(2, sessions.snapshot().active());
+        assertEquals(0, reads.snapshot().inFlight());
+        assertEquals(0, reads.snapshot().waiting());
+
+        replacement.onClosed(1000, "done");
+        active.onClosed(1000, "done");
+        assertEquals(0, sessions.snapshot().active());
+    }
+
     private LupaSession session(
             PublishedImageStore store,
             TileReader reader,
@@ -270,6 +352,17 @@ class LupaSessionFairnessTest {
             for (String text : texts) {
                 JsonNode node = mapper.readTree(text);
                 if (type.equals(node.path("type").asText())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        boolean hasError(String code) throws Exception {
+            for (String text : texts) {
+                JsonNode node = mapper.readTree(text);
+                if ("ERROR".equals(node.path("type").asText())
+                        && code.equals(node.path("code").asText())) {
                     return true;
                 }
             }
