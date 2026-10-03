@@ -5,6 +5,7 @@
     "useDefineForClassFields": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
+    "moduleDetection": "force",
     "skipLibCheck": true,
     "moduleResolution": "Bundler",
     "resolveJsonModule": true,
@@ -12,6 +13,7 @@
     "esModuleInterop": true,
     "jsx": "react-jsx",
     "strict": true,
+    "noImplicitThis": false,
     "noEmit": true,
     "noUncheckedIndexedAccess": true,
     "types": ["vitest/globals"]

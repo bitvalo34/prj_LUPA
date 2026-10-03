@@ -1,0 +1,208 @@
+name: A23 I23 Acceptance
+
+on:
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Install libvips CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvips-tools
+
+      - name: Record environment
+        env:
+          A23_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          mkdir -p outputs/a23
+          {
+            echo "testedCheckout=$(git rev-parse HEAD)"
+            echo "candidateHead=$A23_CANDIDATE_SHA"
+            echo "java=$(java -version 2>&1 | head -n 1)"
+            echo "maven=$(mvn -version | head -n 1)"
+            echo "node=$(node --version)"
+            echo "npm=$(npm --version)"
+            echo "vips=$(vips --version)"
+            if command -v google-chrome >/dev/null; then google-chrome --version; fi
+            if command -v chromium >/dev/null; then chromium --version; fi
+          } | tee outputs/a23/environment.txt
+
+      - name: Frontend install, unit tests and production build
+        working-directory: frontend
+        run: |
+          npm ci --ignore-scripts
+          npm test
+          npm run build
+
+      - name: Backend regression and package
+        run: mvn -B clean verify package
+
+      - name: Verify E23 dependency on current HEAD
+        run: bash scripts/e23/verify-e23-final.sh | tee outputs/a23/e23-final.txt
+
+      - name: Verify A23 import limits regressions
+        run: |
+          mvn -B -Dtest='gt.lupa.ingest.*Test,gt.lupa.storage.*SecurityTest' test \
+            | tee outputs/a23/import-regression.txt
+
+      - name: Prepare two genuinely imported acceptance images
+        run: |
+          RUN_ROOT="$RUNNER_TEMP/lupa-a23"
+          DATA_ROOT="$RUN_ROOT/data"
+          mkdir -p "$RUN_ROOT" "$DATA_ROOT"
+          # Deterministic textured images keep the campaign local while making
+          # detail/focus screenshots visually meaningful. They are actual JPEG
+          # inputs processed by the production import path.
+          vips gaussnoise "$RUN_ROOT/a23-primary.jpg" 4096 3072 --mean 122 --sigma 42 --seed 23001717
+          vips gaussnoise "$RUN_ROOT/a23-secondary.jpg" 3072 4096 --mean 156 --sigma 55 --seed 23004161
+          java -cp target/lupa.jar gt.lupa.ingest.IngestApplication import \
+            --original="$RUN_ROOT/a23-primary.jpg" \
+            --image-id=a23-primary \
+            --display-name="A23 primary" \
+            --license-ref="Generated CI acceptance image" \
+            --data-root="$DATA_ROOT" \
+            --vips=vips --vipsheader=vipsheader --timeout-seconds=120 --jpeg-quality=85 \
+            | tee outputs/a23/import-primary.txt
+          java -cp target/lupa.jar gt.lupa.ingest.IngestApplication import \
+            --original="$RUN_ROOT/a23-secondary.jpg" \
+            --image-id=a23-secondary \
+            --display-name="A23 secondary" \
+            --license-ref="Generated CI acceptance image" \
+            --data-root="$DATA_ROOT" \
+            --vips=vips --vipsheader=vipsheader --timeout-seconds=120 --jpeg-quality=85 \
+            | tee outputs/a23/import-secondary.txt
+          printf 'not-an-image\n' > "$RUN_ROOT/invalid.jpg"
+          sha256sum "$DATA_ROOT/catalog.json" | tee outputs/a23/catalog-before-failure.sha256
+          set +e
+          java -cp target/lupa.jar gt.lupa.ingest.IngestApplication import \
+            --original="$RUN_ROOT/invalid.jpg" \
+            --image-id=a23-invalid \
+            --display-name="A23 invalid" \
+            --license-ref="Negative acceptance case" \
+            --data-root="$DATA_ROOT" \
+            --vips=vips --vipsheader=vipsheader --timeout-seconds=30 --jpeg-quality=85 \
+            > outputs/a23/import-invalid.txt 2>&1
+          invalid_status=$?
+          set -e
+          test "$invalid_status" -ne 0
+          sha256sum "$DATA_ROOT/catalog.json" | tee outputs/a23/catalog-after-failure.sha256
+          diff -u outputs/a23/catalog-before-failure.sha256 outputs/a23/catalog-after-failure.sha256
+          echo "A23_DATA_ROOT=$DATA_ROOT" >> "$GITHUB_ENV"
+
+      - name: Start packaged Java server
+        run: |
+          java -jar target/lupa.jar \
+            --host=127.0.0.1 \
+            --port=18083 \
+            --data-root="$A23_DATA_ROOT" \
+            > outputs/a23/server.log 2>&1 &
+          echo "A23_SERVER_PID=$!" >> "$GITHUB_ENV"
+          for i in {1..100}; do
+            if curl -fsS http://127.0.0.1:18083/api/catalog > outputs/a23/catalog-live.json; then break; fi
+            sleep 0.2
+          done
+          curl -fsS http://127.0.0.1:18083/api/catalog
+          curl -fsS http://127.0.0.1:18083/ | grep -q 'LUPA 64'
+
+      - name: Select installed real browser
+        run: |
+          if command -v google-chrome >/dev/null; then
+            echo "A23_BROWSER=$(command -v google-chrome)" >> "$GITHUB_ENV"
+          elif command -v chromium >/dev/null; then
+            echo "A23_BROWSER=$(command -v chromium)" >> "$GITHUB_ENV"
+          else
+            echo "No Chrome/Chromium browser is installed on this runner" >&2
+            exit 1
+          fi
+
+      - name: Run 100 view changes, 100 detail cycles, focus, image change and recovery
+        env:
+          A23_SEED: '23001717'
+        run: |
+          node scripts/a23/cdp-runner.mjs \
+            http://127.0.0.1:18083 \
+            outputs/a23/browser \
+            full capture-initial capture-detail capture-reduced capture-focus
+
+      - name: Deterministic late decode rejection
+        env:
+          A23_SEED: '23001717'
+          A23_DECODE_DELAY_MS: '500'
+          A23_CDP_PORT: '9224'
+        run: |
+          node scripts/a23/cdp-runner.mjs \
+            http://127.0.0.1:18083 \
+            outputs/a23/late \
+            late
+
+      - name: Compatibility smoke in second browser binary
+        if: ${{ success() }}
+        env:
+          A23_SEED: '23001717'
+          A23_CDP_PORT: '9225'
+        run: |
+          if command -v chromium >/dev/null && [ "$(command -v chromium)" != "$A23_BROWSER" ]; then
+            A23_BROWSER="$(command -v chromium)" node scripts/a23/cdp-runner.mjs \
+              http://127.0.0.1:18083 \
+              outputs/a23/compat \
+              capture-initial capture-detail capture-reduced capture-focus
+          else
+            echo "No second Chrome/Chromium binary available; compatibility smoke skipped" | tee outputs/a23/compat-skipped.txt
+          fi
+
+      - name: Verify private originals are not served
+        run: |
+          status="$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18083/originals/a23-primary.jpg)"
+          test "$status" != "200"
+          echo "originalRouteStatus=$status" | tee outputs/a23/original-route.txt
+
+      - name: I23 slow-active and no-read regressions
+        run: |
+          mvn -B -Dtest='gt.lupa.session.LupaSessionFairnessTest,gt.lupa.session.LupaSessionTimeoutTest,gt.lupa.http.NioHttpServerSlowWebSocketTest,gt.lupa.session.LupaSessionReconnectCleanupTest' test \
+            | tee outputs/a23/i23-slow-active.txt
+
+      - name: Print concise evidence summary
+        if: always()
+        run: |
+          for file in outputs/a23/browser/full.json outputs/a23/late/late.json outputs/a23/browser/metadata.json outputs/a23/compat/metadata.json; do
+            if [ -f "$file" ]; then
+              echo "===== $file ====="
+              cat "$file"
+              echo
+            fi
+          done
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -n "${A23_SERVER_PID:-}" ]; then kill "$A23_SERVER_PID" 2>/dev/null || true; fi
+          cat outputs/a23/server.log 2>/dev/null || true
+
+      - name: Upload acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a23-i23-evidence-${{ github.sha }}
+          path: outputs/a23
+          if-no-files-found: error
+          retention-days: 30
