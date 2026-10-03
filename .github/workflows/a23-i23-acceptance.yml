@@ -68,8 +68,11 @@ jobs:
           RUN_ROOT="$RUNNER_TEMP/lupa-a23"
           DATA_ROOT="$RUN_ROOT/data"
           mkdir -p "$RUN_ROOT" "$DATA_ROOT"
-          vips black "$RUN_ROOT/a23-primary.jpg" 4096 3072 --bands 3
-          vips black "$RUN_ROOT/a23-secondary.jpg" 3072 4096 --bands 3
+          # Deterministic textured images keep the campaign local while making
+          # detail/focus screenshots visually meaningful. They are actual JPEG
+          # inputs processed by the production import path.
+          vips gaussnoise "$RUN_ROOT/a23-primary.jpg" 4096 3072 --mean 122 --sigma 42 --seed 23001717
+          vips gaussnoise "$RUN_ROOT/a23-secondary.jpg" 3072 4096 --mean 156 --sigma 55 --seed 23004161
           java -cp target/lupa.jar gt.lupa.ingest.IngestApplication import \
             --original="$RUN_ROOT/a23-primary.jpg" \
             --image-id=a23-primary \
