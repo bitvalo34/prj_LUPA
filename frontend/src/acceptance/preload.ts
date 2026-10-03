@@ -277,7 +277,7 @@ async function runCampaign(probe: Probe): Promise<void> {
     return finish({ reducedStable: true });
   }
   if (mode === 'capture-focus') {
-    clickText('.navigation-group button', 'Lente'); setRadius(256); await waitStable('foco', 20000); samples.push(sample('focus'));
+    clickText('.navigation-group button', 'Lente'); await setRadius(256); await waitStable('foco', 20000); samples.push(sample('focus'));
     return finish({ focusStable: true });
   }
   if (mode === 'late') {
@@ -346,8 +346,8 @@ async function runCampaign(probe: Probe): Promise<void> {
 
   probe.setPhase('focus');
   clickText('.navigation-group button', 'Lente');
-  setRadius(32); await waitStable('foco mínimo', 20000); samples.push(sample('focus-center'));
-  setRadius(512); dispatchKey(stage(), 'ArrowRight'); dispatchKey(stage(), 'ArrowDown'); await waitStable('foco borde', 20000);
+  await setRadius(32); await waitStable('foco mínimo', 20000); samples.push(sample('focus-center'));
+  await setRadius(512); dispatchKey(stage(), 'ArrowRight'); dispatchKey(stage(), 'ArrowDown'); await waitStable('foco borde', 20000);
   for (let i = 0; i < 4; i++) { dispatchKey(stage(), 'ArrowRight'); dispatchKey(stage(), 'ArrowDown'); await sleep(110); }
   await waitStable('foco esquina', 20000); samples.push(sample('focus-corner'));
   clickText('.navigation-group button', 'Uniforme'); await waitStable('salir de foco', 20000);
@@ -434,7 +434,8 @@ function clickText(selector: string, text: string): void {
   button.click();
 }
 
-function setRadius(value: number): void {
+async function setRadius(value: number): Promise<void> {
+  await waitFor(() => document.querySelector<HTMLInputElement>('.focus-radius input') !== null, 2000, 'No apareció el control de radio de foco');
   const input = document.querySelector<HTMLInputElement>('.focus-radius input');
   if (!input) throw new Error('No se encontró radio de foco');
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, String(value));
