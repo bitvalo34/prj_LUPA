@@ -31,11 +31,13 @@ jobs:
           sudo apt-get install -y libvips-tools
 
       - name: Record environment
+        env:
+          A23_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           mkdir -p outputs/a23
           {
-            echo "commit=$(git rev-parse HEAD)"
-            echo "branch=$(git branch --show-current)"
+            echo "testedCheckout=$(git rev-parse HEAD)"
+            echo "candidateHead=$A23_CANDIDATE_SHA"
             echo "java=$(java -version 2>&1 | head -n 1)"
             echo "maven=$(mvn -version | head -n 1)"
             echo "node=$(node --version)"
@@ -153,6 +155,21 @@ jobs:
             outputs/a23/late \
             late
 
+      - name: Compatibility smoke in second browser binary
+        if: ${{ success() }}
+        env:
+          A23_SEED: '23001717'
+          A23_CDP_PORT: '9225'
+        run: |
+          if command -v chromium >/dev/null && [ "$(command -v chromium)" != "$A23_BROWSER" ]; then
+            A23_BROWSER="$(command -v chromium)" node scripts/a23/cdp-runner.mjs \
+              http://127.0.0.1:18083 \
+              outputs/a23/compat \
+              capture-initial capture-detail capture-reduced capture-focus
+          else
+            echo "No second Chrome/Chromium binary available; compatibility smoke skipped" | tee outputs/a23/compat-skipped.txt
+          fi
+
       - name: Verify private originals are not served
         run: |
           status="$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18083/originals/a23-primary.jpg)"
@@ -163,6 +180,17 @@ jobs:
         run: |
           mvn -B -Dtest='gt.lupa.session.LupaSessionFairnessTest,gt.lupa.session.LupaSessionTimeoutTest,gt.lupa.http.NioHttpServerSlowWebSocketTest,gt.lupa.session.LupaSessionReconnectCleanupTest' test \
             | tee outputs/a23/i23-slow-active.txt
+
+      - name: Print concise evidence summary
+        if: always()
+        run: |
+          for file in outputs/a23/browser/full.json outputs/a23/late/late.json outputs/a23/browser/metadata.json outputs/a23/compat/metadata.json; do
+            if [ -f "$file" ]; then
+              echo "===== $file ====="
+              cat "$file"
+              echo
+            fi
+          done
 
       - name: Stop server
         if: always()
