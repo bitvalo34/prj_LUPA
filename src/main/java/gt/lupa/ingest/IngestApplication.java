@@ -27,6 +27,7 @@ public final class IngestApplication {
             case "preflight" -> runPreflight(optionArgs);
             case "stage" -> runStage(optionArgs);
             case "import" -> runImport(optionArgs);
+            case "import-prepared-dz" -> runPreparedDeepZoomImport(optionArgs);
             default -> {
                 printUsage();
                 yield 2;
@@ -144,6 +145,29 @@ public final class IngestApplication {
         }
     }
 
+    private static int runPreparedDeepZoomImport(String[] optionArgs) {
+        try {
+            PreparedDeepZoomConfig config = PreparedDeepZoomConfig.parse(optionArgs);
+            PreparedDeepZoomPublicationResult result = new PreparedDeepZoomImportService().importAndPublish(config);
+
+            System.out.println("LUPA prepared DeepZoom import OK");
+            System.out.println("imageId=" + result.imageId());
+            System.out.println("imageVersion=" + result.imageVersion());
+            System.out.println("publishedVersionPath=" + result.publishedVersionPath());
+            System.out.println("catalog=" + result.catalogPath());
+            System.out.println("provenance=" + result.provenancePath());
+            System.out.println("tileCount=" + result.tileCount());
+            System.out.println("tileJpegBytes=" + result.tileJpegBytes());
+            return 0;
+        } catch (IngestException e) {
+            System.err.println("Prepared DeepZoom import error: " + e.getMessage());
+            return e.exitCode();
+        } catch (RuntimeException e) {
+            System.err.println("Prepared DeepZoom unexpected error: " + e.getMessage());
+            return 1;
+        }
+    }
+
     private static StageBuildService createStageService(ProcessRunner runner) {
         return new StageBuildService(
                 new PreflightService(runner),
@@ -158,6 +182,7 @@ public final class IngestApplication {
         System.err.println("  preflight --original=/path/file.jpg --image-id=sample-photo --display-name=SamplePhoto --license-ref=OwnPhoto");
         System.err.println("  stage --original=/path/file.jpg --image-id=sample-photo --display-name=SamplePhoto --license-ref=OwnPhoto");
         System.err.println("  import --original=/path/file.jpg --image-id=sample-photo --display-name=SamplePhoto --license-ref=OwnPhoto");
+        System.err.println("  import-prepared-dz --dz-files=/path/pyramid_files --width=75471 --height=75471 --image-id=eval-17 --display-name='Evaluation 17 GB' --license-ref='Authorized evaluation sample' --source-archive='Erwin:PROYECTO-2-IMAGES/Imagenes-28G-17G-Comprimidas.zip' --source-archive-bytes=4159630824 --source-archive-sha256=<64hex> --source-member=017-110-000-24650032.png --source-member-bytes=17114955374");
         System.err.println("Optional:");
         System.err.println("  --data-root=data --vips=vips --vipsheader=vipsheader --timeout-seconds=600 --jpeg-quality=85");
         System.err.println("  --original-policy=copy|reference (default: copy)");
