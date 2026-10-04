@@ -1,5 +1,7 @@
 import { MAX_CANVAS_PIXELS, type Manifest, type TileHeader, type ViewLayout } from './types';
 
+export const MAX_VIEW_ZOOM = 4096;
+
 export interface ViewRect {
   x: number;
   y: number;
@@ -64,7 +66,6 @@ export function tileDestination(
     height: ((originalY1 - originalY0) / viewRect.height) * layout.imageRectPx.height
   };
 }
-
 
 export function fullViewRect(manifest: Manifest): ViewRect {
   return { x: 0, y: 0, width: manifest.width, height: manifest.height };
@@ -131,7 +132,7 @@ export function zoomViewRect(
   rect: ViewRect,
   anchor: { x: number; y: number },
   factor: number,
-  maxZoom = 128
+  maxZoom = MAX_VIEW_ZOOM
 ): ViewRect {
   if (!Number.isFinite(factor) || factor <= 0) throw new Error('Factor de zoom inválido');
   const minWidth = Math.max(1, manifest.width / maxZoom);
