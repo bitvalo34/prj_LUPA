@@ -11,10 +11,15 @@ if (!baseUrl || !outputDir) {
 const modes = modesArg.length > 0
   ? modesArg
   : ['full', 'late', 'capture-initial', 'capture-detail', 'capture-reduced', 'capture-focus'];
-const debugPort = Number(process.env.A23_CDP_PORT ?? '9223');
+const debugPort = positiveNumber(process.env.A23_CDP_PORT, 9223, 'A23_CDP_PORT');
 const seed = Number(process.env.A23_SEED ?? '23001717');
 const browser = process.env.A23_BROWSER ?? 'google-chrome';
 const decodeDelay = Number(process.env.A23_DECODE_DELAY_MS ?? '500');
+const cdpStartupTimeoutMs = positiveNumber(
+  process.env.A23_CDP_STARTUP_TIMEOUT_MS,
+  45000,
+  'A23_CDP_STARTUP_TIMEOUT_MS'
+);
 
 fs.mkdirSync(outputDir, { recursive: true });
 const browserLog = fs.openSync(path.join(outputDir, 'browser.log'), 'w');
@@ -40,7 +45,7 @@ const chrome = spawn(browser, [
 
 let cdp;
 try {
-  const wsUrl = await waitForDebugger(debugPort, 15000);
+  const wsUrl = await waitForDebugger(debugPort, cdpStartupTimeoutMs, chrome);
   cdp = await connectCdp(wsUrl);
   await cdp.call('Page.enable');
   await cdp.call('Runtime.enable');
@@ -56,6 +61,7 @@ try {
     generatedAt: new Date().toISOString(),
     browser,
     seed,
+    cdpStartupTimeoutMs,
     viewport: { width: 1440, height: 1000, dpr: 1 },
     baseUrl,
     modes: []
@@ -106,9 +112,14 @@ try {
   fs.closeSync(browserLog);
 }
 
-async function waitForDebugger(port, timeoutMs) {
+async function waitForDebugger(port, timeoutMs, browserProcess) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    if (browserProcess.exitCode !== null) {
+      throw new Error(
+        `El navegador terminó antes de exponer Chrome DevTools Protocol (exitCode=${browserProcess.exitCode})`
+      );
+    }
     try {
       const response = await fetch(`http://127.0.0.1:${port}/json`);
       if (response.ok) {
@@ -119,7 +130,9 @@ async function waitForDebugger(port, timeoutMs) {
     } catch {}
     await sleep(100);
   }
-  throw new Error('Chrome DevTools Protocol no quedó disponible');
+  throw new Error(
+    `Chrome DevTools Protocol no quedó disponible en ${timeoutMs} ms para ${browser}`
+  );
 }
 
 function connectCdp(wsUrl) {
@@ -190,6 +203,14 @@ async function evaluate(cdp, expression) {
     throw new Error(result.exceptionDetails.text || 'Runtime.evaluate falló');
   }
   return result.result?.value;
+}
+
+function positiveNumber(raw, fallback, name) {
+  const value = Number(raw ?? fallback);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${name} debe ser un número positivo`);
+  }
+  return value;
 }
 
 function sleep(ms) {

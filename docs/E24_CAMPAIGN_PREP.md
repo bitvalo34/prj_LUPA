@@ -1,72 +1,80 @@
-# E24 — Procedimiento preparado desde E23
+# E24 — Campaña reproducible de rendimiento
 
-E23 deja lista esta campaña, pero **no presenta estas ejecuciones como resultados finales**.
+Responsable: **Erwin Arevalo**  
+Estado: **PREPARADA PARA EJECUCIÓN REAL; no se declaran resultados de rendimiento todavía**.
 
-## Variables
+E24 mide 1, 5 y 20 clientes con cinco repeticiones, caché fría/caliente y comparación normal frente a baseline sin cancelación. Los resultados finales deben provenir del equipo real de Erwin; GitHub CI solo valida herramientas.
 
-- `MODE=normal|no-cancel`
-- `CACHE=cold|warm`
-- `CLIENTS=1|5|20`
-- `REPETITIONS=5` por defecto
-- `SCENARIO=aggressive` por defecto
+## Mejoras sobre la preparación de E23
 
-Ejemplo:
+E23 ya aportaba cliente WebSocket real, baseline sin cancelación, escenarios y scripts. E24 añade:
 
-```bash
-MODE=normal CACHE=cold CLIENTS=5 REPETITIONS=5 \
-  bash scripts/e24/run-campaign.sh
-```
+- workload `stable` además del dinámico `aggressive`;
+- semillas independientes `230023..230027`, emparejadas entre variantes;
+- orden normal/no-cancel balanceado entre condiciones;
+- métricas opt-in de sesiones, colas, lecturas, caché, buffers y heap del servidor;
+- muestreo `/proc` de RSS/CPU/IO del servidor y generador;
+- identidad reproducible de la muestra y hashes de catálogo/manifiesto;
+- análisis emparejado y reporte backend regenerable;
+- validación de que la caché warm presenta hits/residencia y cold presenta misses.
 
-## Definición de caché
+## Matriz formal
 
-**cold**: cada repetición arranca un JVM nuevo de LUPA. Por tanto la caché JPEG comprimida de la aplicación empieza vacía.
+Se ejecutan **dos workloads independientes**:
 
-Esto **no vacía la page cache del sistema operativo** y no requiere privilegios.
+1. `stable`: una vista estable por cliente para recepción inicial y terminación del plan.
+2. `aggressive`: 12 intenciones por cliente a 5 ms para estudiar solapamiento/cancelación.
 
-**warm**: se arranca un único JVM, se ejecuta una corrida de calentamiento que no se incluye en el resumen y después se realizan las repeticiones medidas sin reiniciar el servidor.
+Por workload: 2 variantes × 2 estados de caché × 3 cantidades de clientes × 5 repeticiones = **60 ejecuciones medidas**. Suite total: **120 ejecuciones medidas**, más warmups no medidos.
 
-## Matriz recomendada
+## Caché
 
-Para cada modo:
+- `cold`: cada repetición usa un JVM nuevo, por lo que la caché JPEG comprimida de LUPA empieza vacía.
+- `warm`: un JVM persistente ejecuta una corrida de calentamiento no medida y luego las cinco repeticiones.
+- La page cache del sistema operativo **no se vacía**. Por eso se habla de “caché de aplicación fría/caliente”, no de caché total del sistema.
 
-- normal
-- no-cancel
+## Métricas
 
-y para cada estado:
+El cliente técnico registra VIEW→PLAN, VIEW→primera TILE útil, VIEW→última TILE, VIEW→DONE, retraso del generador, bytes JPEG/binarios/control, teselas/bytes obsoletos, errores e incompletos.
 
-- cold
-- warm
+`E24MetricsRecorder` registra, cuando se activa explícitamente, sesiones, colas de disco/metadatos, lecturas, DRR, caché comprimida, buffers transitorios, heap y contadores E22. `sample-process.py` añade RSS, CPU, threads e I/O de Linux/WSL para servidor y generador.
 
-ejecutar:
-
-- 1 cliente × 5 repeticiones
-- 5 clientes × 5 repeticiones
-- 20 clientes × 5 repeticiones
-
-La campaña conserva cada `summary.json`, salida del cliente y log del servidor.
+**VIEW→TILE y VIEW→DONE son métricas de recepción/protocolo, no renderizado.** Las metas “primera vista < 1 s” y “refinamiento visible < 500 ms de mediana” requieren evidencia A24 con navegador/Canvas.
 
 ## Estadística
 
-`summarize-campaign.py` produce:
+Los p95 usan **nearest-rank**. Se conserva una fila por repetición y también la distribución agrupada. Fallos/cancelaciones no reciben latencia cero. El ahorro de bytes usa:
 
-- `runs.csv`: una fila por repetición;
-- `aggregate.json`: agregado de la condición.
-
-Mediana y p95 se calculan sobre **observaciones VIEW exitosas**, no sobre cinco promedios de repetición. Se utiliza percentil nearest-rank. El número de muestras `n` se conserva.
-
-Los clientes fallidos y errores se cuentan por separado y no desaparecen del resumen.
-
-## Ejecución completa sugerida
-
-```bash
-for mode in normal no-cancel; do
-  for cache in cold warm; do
-    for clients in 1 5 20; do
-      MODE="$mode" CACHE="$cache" CLIENTS="$clients" REPETITIONS=5 \
-        bash scripts/e24/run-campaign.sh
-    done
-  done
-done
+```text
+100 × (bytes_baseline − bytes_normal) / bytes_baseline
 ```
 
-La comparación de foco frente a uniforme debe mantenerse como experimento independiente de la comparación de cancelación.
+Los valores negativos se conservan.
+
+## Ejecución local formal
+
+Después de traer esta rama al WSL y confirmar una muestra ya publicada e inmutable:
+
+```bash
+cd /home/erwin/PRJIMA
+
+git status
+git rev-parse HEAD
+java -version
+mvn -version
+
+export IMAGE_ID=demo-grande
+export SAMPLE_SOURCE='DESCRIBIR LA FUENTE REAL DE LA MUESTRA'
+export SAMPLE_PERMISSION='DESCRIBIR EL PERMISO O LICENCIA REAL'
+export JPEG_QUALITY_NOTE='85 si fue la calidad real; si no, indicar desconocida'
+
+bash scripts/e24/run-all-workloads.sh
+```
+
+El script exige árbol rastreado limpio, repite `scripts/e23/verify-e23-final.sh` sobre el mismo commit y después ejecuta ambas matrices. No importes imágenes, navegues manualmente ni ejecutes otras cargas durante los intervalos medidos.
+
+Los resultados quedan bajo `results/e24/formal-<UTC>/`, incluyendo entorno, preflight, configuraciones, datos originales, logs, CSV de servidor/proceso, agregados, comparaciones y `BACKEND_RESULTS.md`.
+
+## Cierre
+
+E24 permanece **PREPARADA** hasta que la campaña real se ejecute y se revisen sus artefactos. Si aparece un defecto reproducible, se conserva la evidencia inicial, se corrige con el cambio mínimo y se repiten las condiciones afectadas. Los límites solo se cambian con evidencia; la baseline sigue desactivada por defecto.

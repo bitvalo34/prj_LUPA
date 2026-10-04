@@ -20,6 +20,9 @@ data/catalog.json
 logs/
 *.log
 
+# Local performance/acceptance results: preserve locally, do not commit bulk evidence
+/results/
+
 # Local A19 validation samples (not source artifacts)
 /prueba*.jpg
 /prueba*.jpeg

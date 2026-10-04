@@ -1,0 +1,67 @@
+name: E24 Tooling CI
+
+on:
+  push:
+    branches: ["feature/e24-performance-campaign"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  verify-e24-tooling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Validate E24 scripts
+        run: |
+          bash -n scripts/e24/capture-environment.sh
+          bash -n scripts/e24/run-campaign.sh
+          bash -n scripts/e24/run-full-matrix.sh
+          bash -n scripts/e24/run-all-workloads.sh
+          python3 -m py_compile scripts/e24/sample-process.py scripts/e24/describe-dataset.py scripts/e24/summarize-campaign.py scripts/e24/validate-matrix.py scripts/e24/analyze-matrix.py
+      - name: Compile and regression suite
+        run: mvn -B clean verify package
+      - name: Smoke opt-in E24 recorder
+        run: |
+          rm -f /tmp/e24-metrics.csv /tmp/e24-server.log /tmp/e24-server.pid
+          java -Dlupa.e24.metricsFile=/tmp/e24-metrics.csv -Dlupa.e24.metricsIntervalMs=100 \
+            -jar target/lupa.jar --host=127.0.0.1 --port=18084 --catalog=fixture >/tmp/e24-server.log 2>&1 &
+          pid=$!
+          echo "$pid" >/tmp/e24-server.pid
+
+          ready=false
+          for i in {1..40}; do
+            if curl --fail --silent http://127.0.0.1:18084/api/catalog >/tmp/e24-catalog.json; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$pid" 2>/dev/null; then
+              echo "E24 smoke server exited before becoming ready" >&2
+              cat /tmp/e24-server.log >&2 || true
+              exit 1
+            fi
+            sleep 0.1
+          done
+          test "$ready" = true
+
+          # E24MetricsRecorder buffers samples for low measurement overhead.
+          # Stop the JVM first so its shutdown hook closes/flushed the recorder,
+          # then inspect the completed evidence file deterministically.
+          sleep 0.35
+          kill "$pid" 2>/dev/null || true
+          wait "$pid" 2>/dev/null || true
+
+          test -f /tmp/e24-metrics.csv
+          test "$(wc -l </tmp/e24-metrics.csv)" -ge 2
+          grep -q 'cacheResidentBytes' /tmp/e24-metrics.csv
+          grep -q 'E24 metrics enabled' /tmp/e24-server.log
+      - name: Stop smoke server
+        if: always()
+        run: |
+          if [ -f /tmp/e24-server.pid ]; then kill "$(cat /tmp/e24-server.pid)" 2>/dev/null || true; fi
+          cat /tmp/e24-server.log 2>/dev/null || true
