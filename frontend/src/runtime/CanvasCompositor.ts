@@ -149,8 +149,15 @@ export class CanvasCompositor {
     if (!manifest || !layout || !viewRect || !context) return;
 
     context.save();
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = 'high';
+    const sourcePixelsPerCanvasPixelX = viewRect.width / Math.max(1, layout.imageRectPx.width);
+    const sourcePixelsPerCanvasPixelY = viewRect.height / Math.max(1, layout.imageRectPx.height);
+    const digitalMagnification = Math.max(
+      1 / Math.max(sourcePixelsPerCanvasPixelX, Number.EPSILON),
+      1 / Math.max(sourcePixelsPerCanvasPixelY, Number.EPSILON)
+    );
+    const pixelMagnified = digitalMagnification > 1.01;
+    context.imageSmoothingEnabled = !pixelMagnified;
+    if (!pixelMagnified) context.imageSmoothingQuality = 'high';
     context.fillStyle = '#171a20';
     context.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
