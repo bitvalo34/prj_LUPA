@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Manifest, TileHeader } from './types';
 import {
+  MAX_VIEW_ZOOM,
   canvasPointToImage,
   centeredTestRegion,
   computeFitLayout,
@@ -101,6 +102,23 @@ describe('A21 navigation math', () => {
     const rect = { x: 0, y: 0, width: 1000, height: 500 };
     const zoomed = zoomViewRect(manifest, rect, { x: 250, y: 125 }, 0.5);
     expect(zoomed).toEqual({ x: 125, y: 62.5, width: 500, height: 250 });
+  });
+
+  it('supports deep digital magnification well beyond the former 128x cap', () => {
+    const huge: Manifest = {
+      type: 'MANIFEST', epoch: 1, imageId: 'eval', imageVersion: 'v1',
+      width: 75471, height: 75471, tileSize: 256,
+      levels: [{ z: 0, width: 148, height: 148 }, { z: 9, width: 75471, height: 75471 }]
+    };
+    const rect = zoomViewRect(
+      huge,
+      { x: 0, y: 0, width: huge.width, height: huge.height },
+      { x: huge.width / 2, y: huge.height / 2 },
+      1 / 10000
+    );
+    expect(MAX_VIEW_ZOOM).toBe(4096);
+    expect(huge.width / rect.width).toBeCloseTo(MAX_VIEW_ZOOM, 5);
+    expect(huge.height / rect.height).toBeCloseTo(MAX_VIEW_ZOOM, 5);
   });
 
   it('clamps panning at image boundaries', () => {
