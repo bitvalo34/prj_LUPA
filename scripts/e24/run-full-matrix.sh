@@ -1,71 +1,64 @@
 #!/usr/bin/env bash
-set -uo pipefail
-
+set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
-
 REPETITIONS="${REPETITIONS:-5}"
 SCENARIO="${SCENARIO:-aggressive}"
-PORT="${PORT:-8081}"
 SEED="${SEED:-230023}"
-MATRIX_ROOT="${MATRIX_ROOT:-results/e24/formal-$(date -u +%Y%m%dT%H%M%SZ)}"
+IMAGE_ID="${IMAGE_ID:-demo-grande}"
+PORT="${PORT:-8081}"
+SAMPLE_SOURCE="${SAMPLE_SOURCE:-}"
+SAMPLE_PERMISSION="${SAMPLE_PERMISSION:-}"
+JPEG_QUALITY_NOTE="${JPEG_QUALITY_NOTE:-unknown-not-persisted-in-manifest}"
+MATRIX_ROOT="${MATRIX_ROOT:-results/e24/matrix-$(date -u +%Y%m%dT%H%M%SZ)-${SCENARIO}}"
 
-if ! [[ "$REPETITIONS" =~ ^[1-9][0-9]*$ ]]; then
-  echo "REPETITIONS must be a positive integer" >&2
-  exit 2
-fi
-
+[[ -n "$SAMPLE_SOURCE" && -n "$SAMPLE_PERMISSION" ]] || { echo "Set SAMPLE_SOURCE and SAMPLE_PERMISSION for formal E24" >&2; exit 2; }
 mkdir -p "$MATRIX_ROOT"
-STATUS="$MATRIX_ROOT/matrix-status.csv"
-printf 'mode,cache,clients,status,exitCode\n' >"$STATUS"
-
+if [[ "${SKIP_BUILD:-0}" != 1 ]]; then mvn -o -q -DskipTests package; fi
+bash scripts/e24/capture-environment.sh "$MATRIX_ROOT/environment.txt" >/dev/null
+python3 scripts/e24/describe-dataset.py --data-root=data --image-id="$IMAGE_ID" --source-note="$SAMPLE_SOURCE" \
+  --permission-note="$SAMPLE_PERMISSION" --jpeg-quality-note="$JPEG_QUALITY_NOTE" --out="$MATRIX_ROOT/dataset.json" >"$MATRIX_ROOT/dataset.out"
 cat >"$MATRIX_ROOT/matrix.properties" <<EOF
+matrixStartedAt=$(date --iso-8601=seconds)
 commit=$(git rev-parse HEAD)
-repetitions=$REPETITIONS
 scenario=$SCENARIO
-seed=$SEED
-port=$PORT
-conditions=12
-measuredRuns=$((12 * REPETITIONS))
-cacheScope=application-cache-only
+repetitions=$REPETITIONS
+baseSeed=$SEED
+imageId=$IMAGE_ID
+clients=1,5,20
+cache=cold,warm
+modes=normal,no-cancel
+expectedMeasuredRuns=$((2*2*3*REPETITIONS))
+orderPolicy=balanced-by-condition
+cacheDefinition=application-cache-only
 osPageCacheControlled=false
+transport=loopback
+serverAndGeneratorSameHost=true
 EOF
 
-echo "E24 formal matrix"
-echo "output=$MATRIX_ROOT"
-echo "conditions=12"
-echo "measured runs=$((12 * REPETITIONS))"
-echo
-
-failures=0
-
-for mode in normal no-cancel; do
-  for cache in cold warm; do
-    for clients in 1 5 20; do
-      echo
-      echo "================================================================"
-      echo "mode=$mode cache=$cache clients=$clients repetitions=$REPETITIONS"
-      echo "================================================================"
-
-      if MODE="$mode"          CACHE="$cache"          CLIENTS="$clients"          REPETITIONS="$REPETITIONS"          SCENARIO="$SCENARIO"          PORT="$PORT"          SEED="$SEED"          OUTPUT_ROOT="$MATRIX_ROOT"          bash scripts/e24/run-campaign.sh; then
-        printf '%s,%s,%s,success,0\n' "$mode" "$cache" "$clients" >>"$STATUS"
-      else
-        code=$?
-        failures=$((failures + 1))
-        printf '%s,%s,%s,failure,%s\n' "$mode" "$cache" "$clients" "$code" >>"$STATUS"
-        echo "Condition failed; evidence was retained. Continuing with the matrix." >&2
+FAILURES=0; PAIR_INDEX=0
+for cache in cold warm; do
+  for clients in 1 5 20; do
+    if (( PAIR_INDEX % 2 == 0 )); then MODES=(normal no-cancel); else MODES=(no-cancel normal); fi
+    PAIR_INDEX=$((PAIR_INDEX+1))
+    for mode in "${MODES[@]}"; do
+      echo "##### E24 scenario=$SCENARIO mode=$mode cache=$cache clients=$clients #####"
+      if ! MODE="$mode" CACHE="$cache" CLIENTS="$clients" REPETITIONS="$REPETITIONS" SCENARIO="$SCENARIO" \
+           OUTPUT_ROOT="$MATRIX_ROOT" SEED="$SEED" IMAGE_ID="$IMAGE_ID" PORT="$PORT" \
+           SAMPLE_SOURCE="$SAMPLE_SOURCE" SAMPLE_PERMISSION="$SAMPLE_PERMISSION" JPEG_QUALITY_NOTE="$JPEG_QUALITY_NOTE" \
+           SKIP_BUILD=1 bash scripts/e24/run-campaign.sh; then
+        FAILURES=$((FAILURES+1)); echo "Condition failed; evidence retained. Continuing." >&2
       fi
     done
   done
 done
 
-python3 scripts/e24/validate-matrix.py "$MATRIX_ROOT" "$REPETITIONS"
-validator=$?
-
-echo
-echo "E24 formal matrix finished: $MATRIX_ROOT"
-echo "conditionFailures=$failures validatorExit=$validator"
-
-if (( failures > 0 || validator != 0 )); then
-  exit 1
-fi
+echo "campaignFailures=$FAILURES" >>"$MATRIX_ROOT/matrix.properties"
+set +e
+python3 scripts/e24/validate-matrix.py "$MATRIX_ROOT" "$REPETITIONS" "$SCENARIO"; VALIDATION=$?
+python3 scripts/e24/analyze-matrix.py "$MATRIX_ROOT" "$SCENARIO"; ANALYSIS=$?
+set -e
+echo "validationExitCode=$VALIDATION" >>"$MATRIX_ROOT/matrix.properties"
+echo "analysisExitCode=$ANALYSIS" >>"$MATRIX_ROOT/matrix.properties"
+echo "E24 matrix: $MATRIX_ROOT; campaignFailures=$FAILURES validation=$VALIDATION analysis=$ANALYSIS"
+if (( FAILURES>0 || VALIDATION!=0 || ANALYSIS!=0 )); then exit 1; fi
