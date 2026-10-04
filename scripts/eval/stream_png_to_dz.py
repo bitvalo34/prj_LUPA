@@ -37,6 +37,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def libvips_version() -> str:
+    """Return the linked libvips version across pyvips releases.
+
+    pyvips.version() accepts exactly one positional flag: 0 for major, 1 for
+    minor and 2 for micro. Keep the calls separate so the helper works with the
+    pyvips 3.x API used in the evaluation WSL.
+    """
+    return ".".join(str(pyvips.version(component)) for component in (0, 1, 2))
+
+
 def main() -> int:
     args = parse_args()
     if not 1 <= args.quality <= 100:
@@ -132,7 +142,7 @@ def main() -> int:
             "jpegQuality": args.quality,
         },
         "elapsedSeconds": elapsed,
-        "libvipsVersion": pyvips.version(0, 1, 2),
+        "libvipsVersion": libvips_version(),
         "cacheMaxMiB": args.max_cache_mib,
     }
 
