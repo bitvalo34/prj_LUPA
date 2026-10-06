@@ -1,0 +1,41 @@
+[A19] preflight...
+[A19] inspecting original...
+[A19] preflight summary
+[A19] originalBytes=176062
+[A19] dimensions=1096x815
+[A19] dataRoot=/home/erwin/PRJIMA/results/a24/import/data-11R6uA
+[A19] usableBytes=886460817408
+[A19] estimatedRequiredBytes=280223638
+[A19] originalPolicy=copy
+[A19] staging and generating pyramid...
+[A19] normalizing image...
+[A19] generating pyramid: levels=4 maxLevel=3 normalized=1096x815
+[A19] validating pyramid...
+[A19] validating tiles 0 / 29 (0.0%)
+[A19] validating tiles 3 / 29 (10.3%)
+[A19] validating tiles 6 / 29 (20.7%)
+[A19] validating tiles 9 / 29 (31.0%)
+[A19] validating tiles 12 / 29 (41.4%)
+[A19] validating tiles 15 / 29 (51.7%)
+[A19] validating tiles 18 / 29 (62.1%)
+[A19] validating tiles 21 / 29 (72.4%)
+[A19] validating tiles 24 / 29 (82.8%)
+[A19] validating tiles 27 / 29 (93.1%)
+[A19] validating tiles 29 / 29 (100.0%)
+[A19] validation complete: 29 tiles
+[A19] preserving original metadata/data...
+[A19] copying private original...
+[A19] publishing immutable pyramid version...
+[A19] updating catalog atomically...
+[A19] publication complete
+LUPA A19 import OK
+imageId=a24-proof
+imageVersion=v1
+publishedVersionPath=/home/erwin/PRJIMA/results/a24/import/data-11R6uA/pyramids/a24-proof/v1
+catalog=/home/erwin/PRJIMA/results/a24/import/data-11R6uA/catalog.json
+originalPolicy=copy
+privateOriginal=/home/erwin/PRJIMA/results/a24/import/data-11R6uA/originals/a24-proof/v1/source.jpg
+originalSha256=783ab0e877d685b9a35a17de1c8e164dc179852d97bb738cf7b72499a6aa3459
+originalBytes=176062
+tileCount=29
+tileJpegBytes=224916

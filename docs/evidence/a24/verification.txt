@@ -1,0 +1,2 @@
+A24_EVIDENCE_VALIDATED: 10 runs, raw traces, statistics, acceptance and candidate hashes PASS
+PDF: 27 pages, rendered and visually inspected; obsolete pending statement removed.

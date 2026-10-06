@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "imageId": "eval-93",
+  "imageVersion": "v1",
+  "width": 176393,
+  "height": 176393,
+  "tileSize": 256,
+  "maxLevel": 10,
+  "manifestSha256": "c54d95167f40108c8ce06034f54e45ebd7db94438fcf560d13ecd30e497955ee",
+  "catalogSha256": "ec700e17267ef65b2d6e32e3b1142ed7351dbae382ed12584de7cd064223663b",
+  "manifest": {
+    "schemaVersion": 1,
+    "imageId": "eval-93",
+    "imageVersion": "v1",
+    "width": 176393,
+    "height": 176393,
+    "tileSize": 256,
+    "overlap": 0,
+    "depth": "onetile",
+    "levels": [
+      {
+        "z": 0,
+        "width": 173,
+        "height": 173
+      },
+      {
+        "z": 1,
+        "width": 345,
+        "height": 345
+      },
+      {
+        "z": 2,
+        "width": 690,
+        "height": 690
+      },
+      {
+        "z": 3,
+        "width": 1379,
+        "height": 1379
+      },
+      {
+        "z": 4,
+        "width": 2757,
+        "height": 2757
+      },
+      {
+        "z": 5,
+        "width": 5513,
+        "height": 5513
+      },
+      {
+        "z": 6,
+        "width": 11025,
+        "height": 11025
+      },
+      {
+        "z": 7,
+        "width": 22050,
+        "height": 22050
+      },
+      {
+        "z": 8,
+        "width": 44099,
+        "height": 44099
+      },
+      {
+        "z": 9,
+        "width": 88197,
+        "height": 88197
+      },
+      {
+        "z": 10,
+        "width": 176393,
+        "height": 176393
+      }
+    ]
+  },
+  "tileFormat": "JPEG",
+  "tileCount": 635214,
+  "pyramidBytes": 28236373947,
+  "perLevel": {
+    "0": {
+      "tiles": 1,
+      "bytes": 2367
+    },
+    "1": {
+      "tiles": 4,
+      "bytes": 8190
+    },
+    "10": {
+      "tiles": 476100,
+      "bytes": 22962677165
+    },
+    "2": {
+      "tiles": 9,
+      "bytes": 30552
+    },
+    "3": {
+      "tiles": 36,
+      "bytes": 142195
+    },
+    "4": {
+      "tiles": 121,
+      "bytes": 719810
+    },
+    "5": {
+      "tiles": 484,
+      "bytes": 4311857
+    },
+    "6": {
+      "tiles": 1936,
+      "bytes": 23999105
+    },
+    "7": {
+      "tiles": 7569,
+      "bytes": 120791133
+    },
+    "8": {
+      "tiles": 29929,
+      "bytes": 737133966
+    },
+    "9": {
+      "tiles": 119025,
+      "bytes": 4386557607
+    }
+  },
+  "jpegQualityNote": "DeepZoom JPEG Q85 generado desde PNG oficial por streaming",
+  "sourceNote": "Imagen oficial de evaluación CC8, Google Drive institucional",
+  "permissionNote": "Proporcionada por el auxiliar/docente para evaluación académica del proyecto"
+}

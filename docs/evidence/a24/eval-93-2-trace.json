@@ -1,0 +1,1874 @@
+{
+  "events": [
+    {
+      "t": 25.30000001192093,
+      "type": "HELLO",
+      "version": 1,
+      "windowBytes": 1048576,
+      "bitmapBudgetBytes": 67108864
+    },
+    {
+      "t": 26.600000023841858,
+      "type": "WELCOME",
+      "version": 1,
+      "windowBytes": 1048576,
+      "maxTileBytes": 262144,
+      "maxInFlight": 16
+    },
+    {
+      "t": 67.90000003576279,
+      "type": "OPEN",
+      "epoch": 1,
+      "imageId": "eval-93"
+    },
+    {
+      "t": 70.69999998807907,
+      "type": "MANIFEST",
+      "epoch": 1,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "width": 176393,
+      "height": 176393,
+      "levels": [
+        {
+          "z": 0,
+          "width": 173,
+          "height": 173
+        },
+        {
+          "z": 1,
+          "width": 345,
+          "height": 345
+        },
+        {
+          "z": 2,
+          "width": 690,
+          "height": 690
+        },
+        {
+          "z": 3,
+          "width": 1379,
+          "height": 1379
+        },
+        {
+          "z": 4,
+          "width": 2757,
+          "height": 2757
+        },
+        {
+          "z": 5,
+          "width": 5513,
+          "height": 5513
+        },
+        {
+          "z": 6,
+          "width": 11025,
+          "height": 11025
+        },
+        {
+          "z": 7,
+          "width": 22050,
+          "height": 22050
+        },
+        {
+          "z": 8,
+          "width": 44099,
+          "height": 44099
+        },
+        {
+          "z": 9,
+          "width": 88197,
+          "height": 88197
+        },
+        {
+          "z": 10,
+          "width": 176393,
+          "height": 176393
+        }
+      ],
+      "tileSize": 256
+    },
+    {
+      "t": 70.90000003576279,
+      "type": "VIEW",
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 176393,
+        "height": 176393
+      },
+      "viewportPx": {
+        "width": 661,
+        "height": 661
+      },
+      "detailOffset": 0,
+      "mode": "uniform",
+      "focus": null
+    },
+    {
+      "t": 74.40000003576279,
+      "type": "PLAN",
+      "epoch": 2,
+      "appliedLevel": 2,
+      "contextLevel": 2
+    },
+    {
+      "t": 75.80000001192093,
+      "type": "DONE",
+      "epoch": 2,
+      "sentTiles": 10
+    },
+    {
+      "t": 77.30000001192093,
+      "type": "TILE",
+      "deliveryId": 1,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_draw": true
+    },
+    {
+      "t": 77.40000003576279,
+      "type": "ACK_STATE",
+      "epoch": 2,
+      "received": [
+        [
+          1,
+          1
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 77.40000003576279,
+      "type": "TILE",
+      "deliveryId": 2,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3725,
+      "_draw": true
+    },
+    {
+      "t": 77.5,
+      "type": "ACK_STATE",
+      "epoch": 2,
+      "received": [
+        [
+          2,
+          2
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 84.5,
+      "type": "TILE",
+      "deliveryId": 1,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_draw": true
+    },
+    {
+      "t": 84.5,
+      "type": "TILE",
+      "deliveryId": 2,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3725,
+      "_draw": true
+    },
+    {
+      "t": 84.5,
+      "type": "TILE",
+      "deliveryId": 3,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3662,
+      "_draw": true
+    },
+    {
+      "t": 84.5,
+      "type": "ACK_STATE",
+      "epoch": 2,
+      "received": [
+        [
+          3,
+          3
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 84.60000002384186,
+      "type": "TILE",
+      "deliveryId": 4,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 0,
+      "w": 178,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3288,
+      "_draw": true
+    },
+    {
+      "t": 84.60000002384186,
+      "type": "ACK_STATE",
+      "epoch": 2,
+      "received": [
+        [
+          4,
+          4
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 84.60000002384186,
+      "type": "TILE",
+      "deliveryId": 5,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3706,
+      "_draw": true
+    },
+    {
+      "t": 84.60000002384186,
+      "type": "ACK_STATE",
+      "epoch": 2,
+      "received": [
+        [
+          5,
+          5
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 84.60000002384186,
+      "type": "TILE",
+      "deliveryId": 6,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3702,
+      "_draw": true
+    },
+    {
+      "t": 84.60000002384186,
+      "type": "ACK_STATE",
+      "epoch": 2,
+      "received": [
+        [
+          6,
+          6
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 84.60000002384186,
+      "type": "TILE",
+      "deliveryId": 7,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 1,
+      "w": 178,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3236,
+      "_draw": true
+    },
+    {
+      "t": 84.60000002384186,
+      "type": "ACK_STATE",
+      "epoch": 2,
+      "received": [
+        [
+          7,
+          7
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 84.60000002384186,
+      "type": "TILE",
+      "deliveryId": 8,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 2,
+      "w": 256,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 3252,
+      "_draw": true
+    },
+    {
+      "t": 84.60000002384186,
+      "type": "ACK_STATE",
+      "epoch": 2,
+      "received": [
+        [
+          8,
+          8
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 84.60000002384186,
+      "type": "TILE",
+      "deliveryId": 9,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 2,
+      "w": 256,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 3175,
+      "_draw": true
+    },
+    {
+      "t": 84.60000002384186,
+      "type": "ACK_STATE",
+      "epoch": 2,
+      "received": [
+        [
+          9,
+          9
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 84.60000002384186,
+      "type": "TILE",
+      "deliveryId": 10,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 2,
+      "w": 178,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 2806,
+      "_draw": true
+    },
+    {
+      "t": 84.60000002384186,
+      "type": "ACK_STATE",
+      "epoch": 2,
+      "received": [
+        [
+          10,
+          10
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 104.80000001192093,
+      "type": "TILE",
+      "deliveryId": 1,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_frame": true
+    },
+    {
+      "t": 104.80000001192093,
+      "type": "TILE",
+      "deliveryId": 2,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3725,
+      "_frame": true
+    },
+    {
+      "t": 111.69999998807907,
+      "type": "TILE",
+      "deliveryId": 1,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_frame": true
+    },
+    {
+      "t": 111.69999998807907,
+      "type": "TILE",
+      "deliveryId": 2,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3725,
+      "_frame": true
+    },
+    {
+      "t": 111.69999998807907,
+      "type": "TILE",
+      "deliveryId": 3,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3662,
+      "_frame": true
+    },
+    {
+      "t": 111.69999998807907,
+      "type": "TILE",
+      "deliveryId": 4,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 0,
+      "w": 178,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3288,
+      "_frame": true
+    },
+    {
+      "t": 111.69999998807907,
+      "type": "TILE",
+      "deliveryId": 5,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3706,
+      "_frame": true
+    },
+    {
+      "t": 111.69999998807907,
+      "type": "TILE",
+      "deliveryId": 6,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3702,
+      "_frame": true
+    },
+    {
+      "t": 111.69999998807907,
+      "type": "TILE",
+      "deliveryId": 7,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 1,
+      "w": 178,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3236,
+      "_frame": true
+    },
+    {
+      "t": 111.69999998807907,
+      "type": "TILE",
+      "deliveryId": 8,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 2,
+      "w": 256,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 3252,
+      "_frame": true
+    },
+    {
+      "t": 111.69999998807907,
+      "type": "TILE",
+      "deliveryId": 9,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 2,
+      "w": 256,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 3175,
+      "_frame": true
+    },
+    {
+      "t": 111.69999998807907,
+      "type": "TILE",
+      "deliveryId": 10,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 2,
+      "w": 178,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 2806,
+      "_frame": true
+    },
+    {
+      "t": 650.6999999880791,
+      "type": "TILE",
+      "deliveryId": 2,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3725
+    },
+    {
+      "t": 650.6999999880791,
+      "type": "TILE",
+      "deliveryId": 3,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3662
+    },
+    {
+      "t": 650.6999999880791,
+      "type": "TILE",
+      "deliveryId": 4,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 0,
+      "w": 178,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3288
+    },
+    {
+      "t": 650.6999999880791,
+      "type": "TILE",
+      "deliveryId": 5,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3706
+    },
+    {
+      "t": 650.6999999880791,
+      "type": "TILE",
+      "deliveryId": 6,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3702
+    },
+    {
+      "t": 650.6999999880791,
+      "type": "TILE",
+      "deliveryId": 7,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 1,
+      "w": 178,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3236
+    },
+    {
+      "t": 650.6999999880791,
+      "type": "TILE",
+      "deliveryId": 8,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 2,
+      "w": 256,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 3252
+    },
+    {
+      "t": 650.6999999880791,
+      "type": "TILE",
+      "deliveryId": 9,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 2,
+      "w": 256,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 3175
+    },
+    {
+      "t": 650.6999999880791,
+      "type": "TILE",
+      "deliveryId": 10,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 2,
+      "w": 178,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 2806
+    },
+    {
+      "t": 650.6999999880791,
+      "type": "VIEW",
+      "epoch": 3,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 176393,
+        "height": 176393
+      },
+      "viewportPx": {
+        "width": 661,
+        "height": 661
+      },
+      "detailOffset": -2,
+      "mode": "uniform",
+      "focus": null
+    },
+    {
+      "t": 652.3000000119209,
+      "type": "PLAN",
+      "epoch": 3,
+      "appliedLevel": 0,
+      "contextLevel": 0
+    },
+    {
+      "t": 653.1999999880791,
+      "type": "DONE",
+      "epoch": 3,
+      "sentTiles": 1
+    },
+    {
+      "t": 653.9000000357628,
+      "type": "TILE",
+      "deliveryId": 1,
+      "epoch": 2,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367
+    },
+    {
+      "t": 654.6000000238419,
+      "type": "TILE",
+      "deliveryId": 11,
+      "epoch": 3,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_draw": true
+    },
+    {
+      "t": 654.6000000238419,
+      "type": "ACK_STATE",
+      "epoch": 3,
+      "received": [
+        [
+          11,
+          11
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 668.4000000357628,
+      "type": "TILE",
+      "deliveryId": 11,
+      "epoch": 3,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_frame": true
+    },
+    {
+      "t": 1234.9000000357628,
+      "type": "VIEW",
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 176393,
+        "height": 176393
+      },
+      "viewportPx": {
+        "width": 661,
+        "height": 661
+      },
+      "detailOffset": 0,
+      "mode": "uniform",
+      "focus": null
+    },
+    {
+      "t": 1236,
+      "type": "PLAN",
+      "epoch": 4,
+      "appliedLevel": 2,
+      "contextLevel": 2
+    },
+    {
+      "t": 1239,
+      "type": "TILE",
+      "deliveryId": 11,
+      "epoch": 3,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_draw": true
+    },
+    {
+      "t": 1239,
+      "type": "TILE",
+      "deliveryId": 12,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3725,
+      "_draw": true
+    },
+    {
+      "t": 1239,
+      "type": "ACK_STATE",
+      "epoch": 4,
+      "received": [
+        [
+          12,
+          12
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 1239,
+      "type": "TILE",
+      "deliveryId": 13,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3662,
+      "_draw": true
+    },
+    {
+      "t": 1239,
+      "type": "ACK_STATE",
+      "epoch": 4,
+      "received": [
+        [
+          13,
+          13
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 1239,
+      "type": "TILE",
+      "deliveryId": 14,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 0,
+      "w": 178,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3288,
+      "_draw": true
+    },
+    {
+      "t": 1239,
+      "type": "ACK_STATE",
+      "epoch": 4,
+      "received": [
+        [
+          14,
+          14
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 1239,
+      "type": "TILE",
+      "deliveryId": 15,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3706,
+      "_draw": true
+    },
+    {
+      "t": 1239,
+      "type": "ACK_STATE",
+      "epoch": 4,
+      "received": [
+        [
+          15,
+          15
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 1239,
+      "type": "TILE",
+      "deliveryId": 16,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3702,
+      "_draw": true
+    },
+    {
+      "t": 1239,
+      "type": "ACK_STATE",
+      "epoch": 4,
+      "received": [
+        [
+          16,
+          16
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 1241.5,
+      "type": "DONE",
+      "epoch": 4,
+      "sentTiles": 9
+    },
+    {
+      "t": 1245.9000000357628,
+      "type": "TILE",
+      "deliveryId": 11,
+      "epoch": 3,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_draw": true
+    },
+    {
+      "t": 1245.9000000357628,
+      "type": "TILE",
+      "deliveryId": 12,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3725,
+      "_draw": true
+    },
+    {
+      "t": 1245.9000000357628,
+      "type": "TILE",
+      "deliveryId": 13,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3662,
+      "_draw": true
+    },
+    {
+      "t": 1245.9000000357628,
+      "type": "TILE",
+      "deliveryId": 14,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 0,
+      "w": 178,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3288,
+      "_draw": true
+    },
+    {
+      "t": 1245.9000000357628,
+      "type": "TILE",
+      "deliveryId": 15,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3706,
+      "_draw": true
+    },
+    {
+      "t": 1245.9000000357628,
+      "type": "TILE",
+      "deliveryId": 16,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3702,
+      "_draw": true
+    },
+    {
+      "t": 1245.9000000357628,
+      "type": "TILE",
+      "deliveryId": 17,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 1,
+      "w": 178,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3236,
+      "_draw": true
+    },
+    {
+      "t": 1245.9000000357628,
+      "type": "ACK_STATE",
+      "epoch": 4,
+      "received": [
+        [
+          17,
+          17
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 1246,
+      "type": "TILE",
+      "deliveryId": 18,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 2,
+      "w": 256,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 3252,
+      "_draw": true
+    },
+    {
+      "t": 1246,
+      "type": "ACK_STATE",
+      "epoch": 4,
+      "received": [
+        [
+          18,
+          18
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 1246,
+      "type": "TILE",
+      "deliveryId": 19,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 2,
+      "w": 256,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 3175,
+      "_draw": true
+    },
+    {
+      "t": 1246,
+      "type": "ACK_STATE",
+      "epoch": 4,
+      "received": [
+        [
+          19,
+          19
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 1246,
+      "type": "TILE",
+      "deliveryId": 20,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 2,
+      "w": 178,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 2806,
+      "_draw": true
+    },
+    {
+      "t": 1246,
+      "type": "ACK_STATE",
+      "epoch": 4,
+      "received": [
+        [
+          20,
+          20
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 1252.699999988079,
+      "type": "TILE",
+      "deliveryId": 11,
+      "epoch": 3,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_frame": true
+    },
+    {
+      "t": 1252.699999988079,
+      "type": "TILE",
+      "deliveryId": 12,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3725,
+      "_frame": true
+    },
+    {
+      "t": 1252.699999988079,
+      "type": "TILE",
+      "deliveryId": 13,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3662,
+      "_frame": true
+    },
+    {
+      "t": 1252.699999988079,
+      "type": "TILE",
+      "deliveryId": 14,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 0,
+      "w": 178,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3288,
+      "_frame": true
+    },
+    {
+      "t": 1252.699999988079,
+      "type": "TILE",
+      "deliveryId": 15,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3706,
+      "_frame": true
+    },
+    {
+      "t": 1252.699999988079,
+      "type": "TILE",
+      "deliveryId": 16,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3702,
+      "_frame": true
+    },
+    {
+      "t": 1259.6000000238419,
+      "type": "TILE",
+      "deliveryId": 11,
+      "epoch": 3,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_frame": true
+    },
+    {
+      "t": 1259.6000000238419,
+      "type": "TILE",
+      "deliveryId": 12,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3725,
+      "_frame": true
+    },
+    {
+      "t": 1259.6000000238419,
+      "type": "TILE",
+      "deliveryId": 13,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3662,
+      "_frame": true
+    },
+    {
+      "t": 1259.6000000238419,
+      "type": "TILE",
+      "deliveryId": 14,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 0,
+      "w": 178,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3288,
+      "_frame": true
+    },
+    {
+      "t": 1259.6000000238419,
+      "type": "TILE",
+      "deliveryId": 15,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3706,
+      "_frame": true
+    },
+    {
+      "t": 1259.6000000238419,
+      "type": "TILE",
+      "deliveryId": 16,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3702,
+      "_frame": true
+    },
+    {
+      "t": 1259.6000000238419,
+      "type": "TILE",
+      "deliveryId": 17,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 1,
+      "w": 178,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3236,
+      "_frame": true
+    },
+    {
+      "t": 1259.6000000238419,
+      "type": "TILE",
+      "deliveryId": 18,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 2,
+      "w": 256,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 3252,
+      "_frame": true
+    },
+    {
+      "t": 1259.6000000238419,
+      "type": "TILE",
+      "deliveryId": 19,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 2,
+      "w": 256,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 3175,
+      "_frame": true
+    },
+    {
+      "t": 1259.6000000238419,
+      "type": "TILE",
+      "deliveryId": 20,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 2,
+      "w": 178,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 2806,
+      "_frame": true
+    },
+    {
+      "t": 1821.4000000357628,
+      "type": "TILE",
+      "deliveryId": 12,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3725
+    },
+    {
+      "t": 1821.4000000357628,
+      "type": "TILE",
+      "deliveryId": 13,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 0,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3662
+    },
+    {
+      "t": 1821.4000000357628,
+      "type": "TILE",
+      "deliveryId": 14,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 0,
+      "w": 178,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3288
+    },
+    {
+      "t": 1821.4000000357628,
+      "type": "TILE",
+      "deliveryId": 15,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3706
+    },
+    {
+      "t": 1821.4000000357628,
+      "type": "TILE",
+      "deliveryId": 16,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 1,
+      "w": 256,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3702
+    },
+    {
+      "t": 1821.4000000357628,
+      "type": "TILE",
+      "deliveryId": 17,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 1,
+      "w": 178,
+      "h": 256,
+      "codec": "jpeg",
+      "payloadBytes": 3236
+    },
+    {
+      "t": 1821.4000000357628,
+      "type": "TILE",
+      "deliveryId": 18,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 0,
+      "y": 2,
+      "w": 256,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 3252
+    },
+    {
+      "t": 1821.4000000357628,
+      "type": "TILE",
+      "deliveryId": 19,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 1,
+      "y": 2,
+      "w": 256,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 3175
+    },
+    {
+      "t": 1821.4000000357628,
+      "type": "TILE",
+      "deliveryId": 20,
+      "epoch": 4,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 2,
+      "x": 2,
+      "y": 2,
+      "w": 178,
+      "h": 178,
+      "codec": "jpeg",
+      "payloadBytes": 2806
+    },
+    {
+      "t": 1821.4000000357628,
+      "type": "VIEW",
+      "epoch": 5,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 176393,
+        "height": 176393
+      },
+      "viewportPx": {
+        "width": 661,
+        "height": 661
+      },
+      "detailOffset": -2,
+      "mode": "uniform",
+      "focus": null
+    },
+    {
+      "t": 1822.5,
+      "type": "PLAN",
+      "epoch": 5,
+      "appliedLevel": 0,
+      "contextLevel": 0
+    },
+    {
+      "t": 1823.300000011921,
+      "type": "TILE",
+      "deliveryId": 11,
+      "epoch": 3,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_draw": true
+    },
+    {
+      "t": 1825.300000011921,
+      "type": "DONE",
+      "epoch": 5,
+      "sentTiles": 1
+    },
+    {
+      "t": 1825.4000000357628,
+      "type": "TILE",
+      "deliveryId": 11,
+      "epoch": 3,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367
+    },
+    {
+      "t": 1830.300000011921,
+      "type": "TILE",
+      "deliveryId": 21,
+      "epoch": 5,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_draw": true
+    },
+    {
+      "t": 1830.300000011921,
+      "type": "ACK_STATE",
+      "epoch": 5,
+      "received": [
+        [
+          21,
+          21
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 1837.1000000238419,
+      "type": "TILE",
+      "deliveryId": 11,
+      "epoch": 3,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_frame": true
+    },
+    {
+      "t": 1844,
+      "type": "TILE",
+      "deliveryId": 21,
+      "epoch": 5,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_frame": true
+    },
+    {
+      "t": 2407.800000011921,
+      "type": "VIEW",
+      "epoch": 6,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 176393,
+        "height": 176393
+      },
+      "viewportPx": {
+        "width": 661,
+        "height": 661
+      },
+      "detailOffset": -2,
+      "mode": "focus",
+      "focus": {
+        "x": 88197,
+        "y": 88197,
+        "radiusPx": 144
+      }
+    },
+    {
+      "t": 2408.900000035763,
+      "type": "PLAN",
+      "epoch": 6,
+      "appliedLevel": 0,
+      "contextLevel": 0
+    },
+    {
+      "t": 2409.699999988079,
+      "type": "DONE",
+      "epoch": 6,
+      "sentTiles": 1
+    },
+    {
+      "t": 2410.199999988079,
+      "type": "TILE",
+      "deliveryId": 21,
+      "epoch": 5,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367
+    },
+    {
+      "t": 2414.699999988079,
+      "type": "TILE",
+      "deliveryId": 22,
+      "epoch": 6,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_draw": true
+    },
+    {
+      "t": 2414.699999988079,
+      "type": "ACK_STATE",
+      "epoch": 6,
+      "received": [
+        [
+          22,
+          22
+        ]
+      ],
+      "missing": []
+    },
+    {
+      "t": 2428.5,
+      "type": "TILE",
+      "deliveryId": 22,
+      "epoch": 6,
+      "imageId": "eval-93",
+      "imageVersion": "v1",
+      "z": 0,
+      "x": 0,
+      "y": 0,
+      "w": 173,
+      "h": 173,
+      "codec": "jpeg",
+      "payloadBytes": 2367,
+      "_frame": true
+    }
+  ],
+  "live": 119716,
+  "peak": 2024116,
+  "closes": 21,
+  "stale": 0,
+  "mixed": 0,
+  "pending": 0,
+  "failures": 0,
+  "epoch": 6,
+  "image": "eval-93",
+  "version": "v1"
+}

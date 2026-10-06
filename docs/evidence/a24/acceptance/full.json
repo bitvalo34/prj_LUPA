@@ -1,0 +1,1681 @@
+{
+  "mode": "full",
+  "seed": 23001717,
+  "startedAt": "2026-10-06T17:21:15.160Z",
+  "finishedAt": "2026-10-06T17:23:45.427Z",
+  "status": "PASS",
+  "checks": {
+    "viewInteractions100": true,
+    "viewConsolidationActive": true,
+    "viewRateLimited": true,
+    "viewFinalStable": true,
+    "detailCycles100": true,
+    "detailRealLevelChange": true,
+    "detailClosesObserved": true,
+    "decodePipelineBounded": true,
+    "detailFinalStable": true,
+    "focusPlansObserved": true,
+    "focusRadius512Observed": true,
+    "secondImageSelected": true,
+    "reconnectRecovered": true,
+    "noStaleCanvasDraw": true,
+    "noImageMix": true,
+    "noExternalRequests": true,
+    "bitmapBudgetBounded": true
+  },
+  "summary": {
+    "interactions": 100,
+    "detailCycles": 100,
+    "wsViews": 234,
+    "receivedTiles": 42,
+    "drawnTiles": 32,
+    "discardedTiles": 10,
+    "failedTiles": 0,
+    "releases": 42,
+    "peakLiveBitmapBytes": 4784104,
+    "peakLiveBitmaps": 21,
+    "peakPendingDecodeJobs": 16,
+    "staleDrawViolations": 0,
+    "imageMixViolations": 0,
+    "externalRequests": 0,
+    "finalPhase": "observing",
+    "finalImage": "demo-auxiliar",
+    "finalVersion": "v1"
+  },
+  "samples": [
+    {
+      "label": "initial",
+      "phase": "observing",
+      "connection": 1,
+      "epoch": 2,
+      "mode": "Uniforme",
+      "detail": "0",
+      "zoom": "1.00×",
+      "received": 21,
+      "drawn": 0,
+      "discarded": 21,
+      "failed": 0,
+      "releases": 21,
+      "managedMiB": 0,
+      "planLevel": 3,
+      "image": "demo-auxiliar",
+      "version": "v1",
+      "canvasHash": "e6a1d1c5"
+    },
+    {
+      "campaign": "view",
+      "index": 1,
+      "action": "+",
+      "epoch": 3
+    },
+    {
+      "campaign": "view",
+      "index": 2,
+      "action": "ArrowLeft",
+      "epoch": 3
+    },
+    {
+      "campaign": "view",
+      "index": 3,
+      "action": "ArrowUp",
+      "epoch": 3
+    },
+    {
+      "campaign": "view",
+      "index": 4,
+      "action": "-",
+      "epoch": 3
+    },
+    {
+      "campaign": "view",
+      "index": 5,
+      "action": "-",
+      "epoch": 4
+    },
+    {
+      "campaign": "view",
+      "index": 6,
+      "action": "ArrowLeft",
+      "epoch": 4
+    },
+    {
+      "campaign": "view",
+      "index": 7,
+      "action": "ArrowUp",
+      "epoch": 4
+    },
+    {
+      "campaign": "view",
+      "index": 8,
+      "action": "ArrowDown",
+      "epoch": 4
+    },
+    {
+      "campaign": "view",
+      "index": 9,
+      "action": "-",
+      "epoch": 4
+    },
+    {
+      "campaign": "view",
+      "index": 10,
+      "action": "-",
+      "epoch": 4
+    },
+    {
+      "campaign": "view",
+      "index": 11,
+      "action": "ArrowLeft",
+      "epoch": 4
+    },
+    {
+      "campaign": "view",
+      "index": 12,
+      "action": "+",
+      "epoch": 5
+    },
+    {
+      "campaign": "view",
+      "index": 13,
+      "action": "ArrowUp",
+      "epoch": 5
+    },
+    {
+      "campaign": "view",
+      "index": 14,
+      "action": "+",
+      "epoch": 5
+    },
+    {
+      "campaign": "view",
+      "index": 15,
+      "action": "ArrowUp",
+      "epoch": 5
+    },
+    {
+      "campaign": "view",
+      "index": 16,
+      "action": "+",
+      "epoch": 5
+    },
+    {
+      "campaign": "view",
+      "index": 17,
+      "action": "+",
+      "epoch": 6
+    },
+    {
+      "campaign": "view",
+      "index": 18,
+      "action": "ArrowRight",
+      "epoch": 6
+    },
+    {
+      "campaign": "view",
+      "index": 19,
+      "action": "-",
+      "epoch": 6
+    },
+    {
+      "campaign": "view",
+      "index": 20,
+      "action": "ArrowDown",
+      "epoch": 6
+    },
+    {
+      "campaign": "view",
+      "index": 21,
+      "action": "ArrowDown",
+      "epoch": 6
+    },
+    {
+      "campaign": "view",
+      "index": 22,
+      "action": "ArrowUp",
+      "epoch": 7
+    },
+    {
+      "campaign": "view",
+      "index": 23,
+      "action": "+",
+      "epoch": 7
+    },
+    {
+      "campaign": "view",
+      "index": 24,
+      "action": "ArrowRight",
+      "epoch": 7
+    },
+    {
+      "campaign": "view",
+      "index": 25,
+      "action": "-",
+      "epoch": 7
+    },
+    {
+      "campaign": "view",
+      "index": 26,
+      "action": "ArrowRight",
+      "epoch": 8
+    },
+    {
+      "campaign": "view",
+      "index": 27,
+      "action": "+",
+      "epoch": 8
+    },
+    {
+      "campaign": "view",
+      "index": 28,
+      "action": "ArrowDown",
+      "epoch": 8
+    },
+    {
+      "campaign": "view",
+      "index": 29,
+      "action": "ArrowLeft",
+      "epoch": 8
+    },
+    {
+      "campaign": "view",
+      "index": 30,
+      "action": "ArrowLeft",
+      "epoch": 8
+    },
+    {
+      "campaign": "view",
+      "index": 31,
+      "action": "ArrowDown",
+      "epoch": 9
+    },
+    {
+      "campaign": "view",
+      "index": 32,
+      "action": "ArrowRight",
+      "epoch": 9
+    },
+    {
+      "campaign": "view",
+      "index": 33,
+      "action": "-",
+      "epoch": 9
+    },
+    {
+      "campaign": "view",
+      "index": 34,
+      "action": "-",
+      "epoch": 9
+    },
+    {
+      "campaign": "view",
+      "index": 35,
+      "action": "-",
+      "epoch": 9
+    },
+    {
+      "campaign": "view",
+      "index": 36,
+      "action": "ArrowUp",
+      "epoch": 10
+    },
+    {
+      "campaign": "view",
+      "index": 37,
+      "action": "ArrowRight",
+      "epoch": 10
+    },
+    {
+      "campaign": "view",
+      "index": 38,
+      "action": "ArrowUp",
+      "epoch": 10
+    },
+    {
+      "campaign": "view",
+      "index": 39,
+      "action": "+",
+      "epoch": 10
+    },
+    {
+      "campaign": "view",
+      "index": 40,
+      "action": "ArrowRight",
+      "epoch": 10
+    },
+    {
+      "campaign": "view",
+      "index": 41,
+      "action": "ArrowLeft",
+      "epoch": 11
+    },
+    {
+      "campaign": "view",
+      "index": 42,
+      "action": "ArrowRight",
+      "epoch": 11
+    },
+    {
+      "campaign": "view",
+      "index": 43,
+      "action": "ArrowDown",
+      "epoch": 11
+    },
+    {
+      "campaign": "view",
+      "index": 44,
+      "action": "ArrowLeft",
+      "epoch": 11
+    },
+    {
+      "campaign": "view",
+      "index": 45,
+      "action": "ArrowRight",
+      "epoch": 12
+    },
+    {
+      "campaign": "view",
+      "index": 46,
+      "action": "+",
+      "epoch": 12
+    },
+    {
+      "campaign": "view",
+      "index": 47,
+      "action": "ArrowUp",
+      "epoch": 12
+    },
+    {
+      "campaign": "view",
+      "index": 48,
+      "action": "+",
+      "epoch": 12
+    },
+    {
+      "campaign": "view",
+      "index": 49,
+      "action": "-",
+      "epoch": 12
+    },
+    {
+      "campaign": "view",
+      "index": 50,
+      "action": "ArrowLeft",
+      "epoch": 13
+    },
+    {
+      "campaign": "view",
+      "index": 51,
+      "action": "ArrowLeft",
+      "epoch": 13
+    },
+    {
+      "campaign": "view",
+      "index": 52,
+      "action": "ArrowUp",
+      "epoch": 13
+    },
+    {
+      "campaign": "view",
+      "index": 53,
+      "action": "ArrowUp",
+      "epoch": 13
+    },
+    {
+      "campaign": "view",
+      "index": 54,
+      "action": "ArrowDown",
+      "epoch": 13
+    },
+    {
+      "campaign": "view",
+      "index": 55,
+      "action": "ArrowUp",
+      "epoch": 14
+    },
+    {
+      "campaign": "view",
+      "index": 56,
+      "action": "ArrowUp",
+      "epoch": 14
+    },
+    {
+      "campaign": "view",
+      "index": 57,
+      "action": "-",
+      "epoch": 14
+    },
+    {
+      "campaign": "view",
+      "index": 58,
+      "action": "ArrowRight",
+      "epoch": 14
+    },
+    {
+      "campaign": "view",
+      "index": 59,
+      "action": "ArrowDown",
+      "epoch": 14
+    },
+    {
+      "campaign": "view",
+      "index": 60,
+      "action": "ArrowLeft",
+      "epoch": 15
+    },
+    {
+      "campaign": "view",
+      "index": 61,
+      "action": "-",
+      "epoch": 15
+    },
+    {
+      "campaign": "view",
+      "index": 62,
+      "action": "ArrowDown",
+      "epoch": 15
+    },
+    {
+      "campaign": "view",
+      "index": 63,
+      "action": "+",
+      "epoch": 15
+    },
+    {
+      "campaign": "view",
+      "index": 64,
+      "action": "ArrowDown",
+      "epoch": 15
+    },
+    {
+      "campaign": "view",
+      "index": 65,
+      "action": "-",
+      "epoch": 16
+    },
+    {
+      "campaign": "view",
+      "index": 66,
+      "action": "ArrowRight",
+      "epoch": 16
+    },
+    {
+      "campaign": "view",
+      "index": 67,
+      "action": "ArrowLeft",
+      "epoch": 16
+    },
+    {
+      "campaign": "view",
+      "index": 68,
+      "action": "+",
+      "epoch": 16
+    },
+    {
+      "campaign": "view",
+      "index": 69,
+      "action": "ArrowUp",
+      "epoch": 17
+    },
+    {
+      "campaign": "view",
+      "index": 70,
+      "action": "+",
+      "epoch": 17
+    },
+    {
+      "campaign": "view",
+      "index": 71,
+      "action": "ArrowDown",
+      "epoch": 17
+    },
+    {
+      "campaign": "view",
+      "index": 72,
+      "action": "ArrowLeft",
+      "epoch": 17
+    },
+    {
+      "campaign": "view",
+      "index": 73,
+      "action": "-",
+      "epoch": 17
+    },
+    {
+      "campaign": "view",
+      "index": 74,
+      "action": "ArrowLeft",
+      "epoch": 18
+    },
+    {
+      "campaign": "view",
+      "index": 75,
+      "action": "+",
+      "epoch": 18
+    },
+    {
+      "campaign": "view",
+      "index": 76,
+      "action": "ArrowLeft",
+      "epoch": 18
+    },
+    {
+      "campaign": "view",
+      "index": 77,
+      "action": "ArrowRight",
+      "epoch": 18
+    },
+    {
+      "campaign": "view",
+      "index": 78,
+      "action": "ArrowUp",
+      "epoch": 18
+    },
+    {
+      "campaign": "view",
+      "index": 79,
+      "action": "ArrowDown",
+      "epoch": 19
+    },
+    {
+      "campaign": "view",
+      "index": 80,
+      "action": "+",
+      "epoch": 19
+    },
+    {
+      "campaign": "view",
+      "index": 81,
+      "action": "ArrowLeft",
+      "epoch": 19
+    },
+    {
+      "campaign": "view",
+      "index": 82,
+      "action": "+",
+      "epoch": 19
+    },
+    {
+      "campaign": "view",
+      "index": 83,
+      "action": "+",
+      "epoch": 19
+    },
+    {
+      "campaign": "view",
+      "index": 84,
+      "action": "ArrowLeft",
+      "epoch": 20
+    },
+    {
+      "campaign": "view",
+      "index": 85,
+      "action": "ArrowUp",
+      "epoch": 20
+    },
+    {
+      "campaign": "view",
+      "index": 86,
+      "action": "-",
+      "epoch": 20
+    },
+    {
+      "campaign": "view",
+      "index": 87,
+      "action": "-",
+      "epoch": 20
+    },
+    {
+      "campaign": "view",
+      "index": 88,
+      "action": "ArrowLeft",
+      "epoch": 20
+    },
+    {
+      "campaign": "view",
+      "index": 89,
+      "action": "ArrowDown",
+      "epoch": 21
+    },
+    {
+      "campaign": "view",
+      "index": 90,
+      "action": "ArrowLeft",
+      "epoch": 21
+    },
+    {
+      "campaign": "view",
+      "index": 91,
+      "action": "-",
+      "epoch": 21
+    },
+    {
+      "campaign": "view",
+      "index": 92,
+      "action": "ArrowDown",
+      "epoch": 21
+    },
+    {
+      "campaign": "view",
+      "index": 93,
+      "action": "-",
+      "epoch": 21
+    },
+    {
+      "campaign": "view",
+      "index": 94,
+      "action": "ArrowLeft",
+      "epoch": 22
+    },
+    {
+      "campaign": "view",
+      "index": 95,
+      "action": "ArrowRight",
+      "epoch": 22
+    },
+    {
+      "campaign": "view",
+      "index": 96,
+      "action": "-",
+      "epoch": 22
+    },
+    {
+      "campaign": "view",
+      "index": 97,
+      "action": "+",
+      "epoch": 22
+    },
+    {
+      "campaign": "view",
+      "index": 98,
+      "action": "-",
+      "epoch": 22
+    },
+    {
+      "campaign": "view",
+      "index": 99,
+      "action": "ArrowRight",
+      "epoch": 23
+    },
+    {
+      "campaign": "view",
+      "index": 100,
+      "action": "ArrowLeft",
+      "epoch": 23
+    },
+    {
+      "label": "after-100-views",
+      "phase": "observing",
+      "connection": 1,
+      "epoch": 24,
+      "mode": "Uniforme",
+      "detail": "0",
+      "zoom": "1.24×",
+      "received": 125,
+      "drawn": 0,
+      "discarded": 125,
+      "failed": 0,
+      "releases": 125,
+      "managedMiB": 0,
+      "planLevel": 3,
+      "image": "demo-auxiliar",
+      "version": "v1",
+      "canvasHash": "e6a1d1c5"
+    },
+    {
+      "campaign": "detail",
+      "cycle": 1,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 2,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 3,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 4,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 5,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 6,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 7,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 8,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 9,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 10,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 11,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 12,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 13,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 14,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 15,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 16,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 17,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 18,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 19,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 20,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 21,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 22,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 23,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 24,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 25,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 26,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 27,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 28,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 29,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 30,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 31,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 32,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 33,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 34,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 35,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 36,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 37,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 38,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 39,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 40,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 41,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 42,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 43,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 44,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 45,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 46,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 47,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 48,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 49,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 50,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 51,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 52,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 53,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 54,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 55,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 56,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 57,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 58,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 59,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 60,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 61,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 62,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 63,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 64,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 65,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 66,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 67,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 68,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 69,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 70,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 71,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 72,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 73,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 74,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 75,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 76,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 77,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 78,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 79,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 80,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 81,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 82,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 83,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 84,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 85,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 86,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 87,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 88,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 89,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 90,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 91,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 92,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 93,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 94,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 95,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 96,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 97,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 98,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 99,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "campaign": "detail",
+      "cycle": 100,
+      "lowLevel": 1,
+      "highLevel": 3,
+      "reducedLevel": 1,
+      "closedBitmaps": 22,
+      "managedMiB": 0
+    },
+    {
+      "label": "after-100-detail-cycles",
+      "phase": "observing",
+      "connection": 1,
+      "epoch": 226,
+      "mode": "Uniforme",
+      "detail": "-2",
+      "zoom": "1.00×",
+      "received": 2347,
+      "drawn": 0,
+      "discarded": 2347,
+      "failed": 0,
+      "releases": 2347,
+      "managedMiB": 0,
+      "planLevel": 1,
+      "image": "demo-auxiliar",
+      "version": "v1",
+      "canvasHash": "e6a1d1c5"
+    },
+    {
+      "label": "focus-center",
+      "phase": "observing",
+      "connection": 1,
+      "epoch": 228,
+      "mode": "Lente",
+      "detail": "-2",
+      "zoom": "1.00×",
+      "received": 2351,
+      "drawn": 0,
+      "discarded": 2351,
+      "failed": 0,
+      "releases": 2351,
+      "managedMiB": 0,
+      "planLevel": 1,
+      "image": "demo-auxiliar",
+      "version": "v1",
+      "canvasHash": "e6a1d1c5"
+    },
+    {
+      "label": "focus-corner",
+      "phase": "observing",
+      "connection": 1,
+      "epoch": 229,
+      "mode": "Lente",
+      "detail": "-2",
+      "zoom": "1.00×",
+      "received": 2354,
+      "drawn": 0,
+      "discarded": 2354,
+      "failed": 0,
+      "releases": 2354,
+      "managedMiB": 0,
+      "planLevel": 1,
+      "image": "demo-auxiliar",
+      "version": "v1",
+      "canvasHash": "e6a1d1c5"
+    },
+    {
+      "label": "second-image",
+      "phase": "observing",
+      "connection": 1,
+      "epoch": 234,
+      "mode": "Uniforme",
+      "detail": "0",
+      "zoom": "1.00×",
+      "received": 2381,
+      "drawn": 21,
+      "discarded": 2360,
+      "failed": 0,
+      "releases": 2381,
+      "managedMiB": 4.6,
+      "planLevel": 3,
+      "image": "demo-grande",
+      "version": "v1",
+      "canvasHash": "44db1382"
+    },
+    {
+      "label": "after-reconnect",
+      "phase": "observing",
+      "connection": 2,
+      "epoch": 4,
+      "mode": "Uniforme",
+      "detail": "0",
+      "zoom": "1.00×",
+      "received": 42,
+      "drawn": 32,
+      "discarded": 10,
+      "failed": 0,
+      "releases": 42,
+      "managedMiB": 3.5,
+      "planLevel": 3,
+      "image": "demo-auxiliar",
+      "version": "v1",
+      "canvasHash": "ae780c81"
+    }
+  ],
+  "failures": []
+}

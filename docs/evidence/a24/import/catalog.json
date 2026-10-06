@@ -1,0 +1,11 @@
+{
+  "schemaVersion" : 1,
+  "images" : [ {
+    "imageId" : "a24-proof",
+    "imageVersion" : "v1",
+    "width" : 1096,
+    "height" : 815,
+    "tileSize" : 256,
+    "maxLevel" : 3
+  } ]
+}

@@ -1,0 +1,7 @@
+scenario,cache,clients,pairedSeeds,jpegSavingsMedianPct,jpegSavingsMinPct,jpegSavingsMaxPct,applicationSavingsMedianPct,normalFirstUsefulMedianMs,baselineFirstUsefulMedianMs,normalDoneMedianMs,baselineDoneMedianMs,normalObsoleteByteRatio,baselineObsoleteByteRatio,normalIncompleteViews,baselineIncompleteViews
+stable,cold,1,5,0.0,0.0,0.0,0.0,56.713786,55.768115,101.06869,99.765386,0.0,0.0,0,0
+stable,cold,5,5,0.0,0.0,0.0,0.0,83.614985,64.227202,162.331347,122.147575,0.0,0.0,0,0
+stable,cold,20,5,0.0,0.0,0.0,0.0,97.51249,99.3409055,196.6408845,196.543568,0.0,0.0,0,0
+stable,warm,1,5,0.0,0.0,0.0,0.0,6.180076,6.438205,17.169296,16.747087,0.0,0.0,0,0
+stable,warm,5,5,0.0,0.0,0.0,0.0,7.574156,7.129157,41.68644,38.221036,0.0,0.0,0,0
+stable,warm,20,5,0.0,0.0,0.0,0.0,11.904309000000001,14.194169500000001,79.6388,92.17098,0.0,0.0,0,0

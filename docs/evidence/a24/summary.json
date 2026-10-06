@@ -1,0 +1,62 @@
+{
+  "status": "PASS",
+  "runs": 10,
+  "externalRequests": 0,
+  "browserExceptions": 0,
+  "images": {
+    "demo-grande": {
+      "initialDrawMs": {
+        "n": 5,
+        "median": 35,
+        "p95": 523.5999999642372,
+        "max": 523.5999999642372
+      },
+      "initialFrameProxyMs": {
+        "n": 5,
+        "median": 52.89999997615814,
+        "p95": 549.6999999880791,
+        "max": 549.6999999880791
+      },
+      "refinementDrawMs": {
+        "n": 5,
+        "median": 21.19999998807907,
+        "p95": 34.30000001192093,
+        "max": 34.30000001192093
+      },
+      "refinementFrameProxyMs": {
+        "n": 5,
+        "median": 34.89999997615814,
+        "p95": 47.89999997615814,
+        "max": 47.89999997615814
+      },
+      "peakLiveBytes": 4784104
+    },
+    "eval-93": {
+      "initialDrawMs": {
+        "n": 5,
+        "median": 26.600000023841858,
+        "p95": 40.69999998807907,
+        "max": 40.69999998807907
+      },
+      "initialFrameProxyMs": {
+        "n": 5,
+        "median": 37.60000002384186,
+        "p95": 84.69999998807907,
+        "max": 84.69999998807907
+      },
+      "refinementDrawMs": {
+        "n": 5,
+        "median": 11.300000011920929,
+        "p95": 12.600000023841858,
+        "max": 12.600000023841858
+      },
+      "refinementFrameProxyMs": {
+        "n": 5,
+        "median": 25.100000023841858,
+        "p95": 26.100000023841858,
+        "max": 26.100000023841858
+      },
+      "peakLiveBytes": 2024116
+    }
+  }
+}
