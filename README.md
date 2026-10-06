@@ -2,9 +2,11 @@
 
 LUPA (Lectura Ultraresolutiva Progresiva y Adaptativa) — servidor asíncrono académico en Java 21.
 
-## Base integrada hasta E22
+## Estado actual
 
-`main` incorpora S19, E19/A19/I19, E20/A20/I20, E21/A21/I21 y E22. A22 endurece la revisión funcional del visor: segunda imagen y versiones sin reinicio, recuperación de errores, reconexión, contadores y evidencia de memoria.
+**A24 (6 de octubre de 2026):** la consolidación final, el candidato verificado y la evidencia se describen en [docs/A24.md](docs/A24.md). RFC final: [output/pdf/LUPA-RFC-A24-Evaluacion.pdf](output/pdf/LUPA-RFC-A24-Evaluacion.pdf). Guion: [docs/A24-DEFENSA.md](docs/A24-DEFENSA.md). Construir el frontend antes de empaquetar Java para servir el asset actualizado.
+
+`main` incorpora el desarrollo base, A22/I22, A23/I23 y E24. La revisión A24, la evidencia y el ajuste del visor están preparados; Erwin confirmará el cierre técnico. Su identidad exacta y límites están registrados en docs/A24.md. El historial de módulos se conserva en `docs/`.
 
 Requisitos de desarrollo comprobados:
 

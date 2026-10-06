@@ -1,0 +1,21 @@
+{
+  "schemaVersion" : 1,
+  "importKind" : "prepared-deepzoom-stream",
+  "imageId" : "eval-93",
+  "imageVersion" : "v1",
+  "displayName" : "Evaluacion oficial 93 GB",
+  "licenseRef" : "Imagen oficial proporcionada para evaluacion del Proyecto de Imagenes CC8",
+  "sourceArchive" : "Erwin:Imagen-93GB-Comprimida.zip",
+  "sourceArchiveBytes" : 7825139205,
+  "sourceArchiveSha256" : "2a85eb2fa2279e7e8c4899e8a681c331f9894645496ce1405cbf5d37cede629e",
+  "sourceMember" : "093-494-000-120123412.png",
+  "sourceMemberBytes" : 93493762699,
+  "normalizedWidth" : 176393,
+  "normalizedHeight" : 176393,
+  "jpegQuality" : 85,
+  "tileCount" : 635214,
+  "tileJpegBytes" : 28236373947,
+  "preparedDzFilesRoot" : "/home/erwin/PRJIMA/results/eval-stream-test/93gb-dz/pyramid_files",
+  "importedAtUtc" : "2026-10-04T07:15:39.630764017Z",
+  "sourceIntegrityPolicy" : "archive SHA-256 supplied from authoritative remote metadata; prepared tiles fully validated locally"
+}

@@ -1,0 +1,13 @@
+scenario,mode,cache,clients,campaignDir,repetitionsFound,failedClients,errors,distinctSeeds,serverMetricEvidence,status
+aggressive,normal,cold,1,results/e24/formal-20261004T072126Z/aggressive/e24-20261004T073139Z-normal-cold-c1-aggressive,5,0,0,5,True,success
+aggressive,normal,cold,5,results/e24/formal-20261004T072126Z/aggressive/e24-20261004T073351Z-normal-cold-c5-aggressive,5,0,0,5,True,success
+aggressive,normal,cold,20,results/e24/formal-20261004T072126Z/aggressive/e24-20261004T073436Z-normal-cold-c20-aggressive,5,0,0,5,True,success
+aggressive,normal,warm,1,results/e24/formal-20261004T072126Z/aggressive/e24-20261004T073653Z-normal-warm-c1-aggressive,5,0,0,5,True,success
+aggressive,normal,warm,5,results/e24/formal-20261004T072126Z/aggressive/e24-20261004T073734Z-normal-warm-c5-aggressive,5,0,0,5,True,success
+aggressive,normal,warm,20,results/e24/formal-20261004T072126Z/aggressive/e24-20261004T073944Z-normal-warm-c20-aggressive,5,0,0,5,True,success
+aggressive,no-cancel,cold,1,results/e24/formal-20261004T072126Z/aggressive/e24-20261004T073221Z-no-cancel-cold-c1-aggressive,5,0,0,5,True,success
+aggressive,no-cancel,cold,5,results/e24/formal-20261004T072126Z/aggressive/e24-20261004T073306Z-no-cancel-cold-c5-aggressive,5,0,0,5,True,success
+aggressive,no-cancel,cold,20,results/e24/formal-20261004T072126Z/aggressive/e24-20261004T073523Z-no-cancel-cold-c20-aggressive,5,0,0,5,True,success
+aggressive,no-cancel,warm,1,results/e24/formal-20261004T072126Z/aggressive/e24-20261004T073611Z-no-cancel-warm-c1-aggressive,5,0,0,5,True,success
+aggressive,no-cancel,warm,5,results/e24/formal-20261004T072126Z/aggressive/e24-20261004T073816Z-no-cancel-warm-c5-aggressive,5,0,0,5,True,success
+aggressive,no-cancel,warm,20,results/e24/formal-20261004T072126Z/aggressive/e24-20261004T073859Z-no-cancel-warm-c20-aggressive,5,0,0,5,True,success

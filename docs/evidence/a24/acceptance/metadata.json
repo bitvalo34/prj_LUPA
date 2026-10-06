@@ -1,0 +1,25 @@
+{
+  "generatedAt": "2026-10-06T17:21:15.104Z",
+  "browser": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "seed": 23001717,
+  "cdpStartupTimeoutMs": 45000,
+  "viewport": {
+    "width": 1440,
+    "height": 1000,
+    "dpr": 1
+  },
+  "baseUrl": "http://127.0.0.1:18084",
+  "modes": [
+    {
+      "mode": "full",
+      "status": "PASS",
+      "failures": []
+    },
+    {
+      "mode": "late",
+      "status": "PASS",
+      "failures": []
+    }
+  ],
+  "status": "PASS"
+}

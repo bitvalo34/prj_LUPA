@@ -1,0 +1,18 @@
+[
+  {
+    "path": "/api/catalog",
+    "status": 200
+  },
+  {
+    "path": "/originals/demo-grande/v1/source.tiff",
+    "status": 404
+  },
+  {
+    "path": "/staging/test",
+    "status": 404
+  },
+  {
+    "path": "/pyramids/eval-93/v1/tiles/0/0_0.jpg",
+    "status": 404
+  }
+]

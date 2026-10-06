@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-06T17:20:47.100Z",
+  "browserVersion": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/154.0.8037.98",
+    "revision": "@b859317bf11f6be47f9b7799ec690a0a42a1fb33",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+    "jsVersion": "15.4.80.20"
+  },
+  "os": "Windows 11 Home",
+  "cpu": "AMD Ryzen 9 8940HX with Radeon Graphics        ",
+  "logicalCpus": 32,
+  "totalMemory": 33342455808,
+  "viewport": {
+    "width": 1440,
+    "height": 1000,
+    "dpr": 1
+  },
+  "base": "http://127.0.0.1:18084",
+  "images": [
+    "demo-grande",
+    "eval-93"
+  ],
+  "repeats": 5,
+  "cache": "HTTP disabled; Java LRU retained across runs; OS cache not cleared",
+  "headless": true,
+  "network": "External browser traffic routed through unavailable local proxy; loopback bypass. Host network not disabled."
+}

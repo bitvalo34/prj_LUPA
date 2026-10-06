@@ -1,0 +1,13 @@
+scenario,mode,cache,clients,campaignDir,repetitionsFound,failedClients,errors,distinctSeeds,serverMetricEvidence,status
+stable,normal,cold,1,results/e24/formal-20261004T072126Z/stable/e24-20261004T072217Z-normal-cold-c1-stable,5,0,0,5,True,success
+stable,normal,cold,5,results/e24/formal-20261004T072126Z/stable/e24-20261004T072424Z-normal-cold-c5-stable,5,0,0,5,True,success
+stable,normal,cold,20,results/e24/formal-20261004T072126Z/stable/e24-20261004T072508Z-normal-cold-c20-stable,5,0,0,5,True,success
+stable,normal,warm,1,results/e24/formal-20261004T072126Z/stable/e24-20261004T072723Z-normal-warm-c1-stable,5,0,0,5,True,success
+stable,normal,warm,5,results/e24/formal-20261004T072126Z/stable/e24-20261004T072807Z-normal-warm-c5-stable,5,0,0,5,True,success
+stable,normal,warm,20,results/e24/formal-20261004T072126Z/stable/e24-20261004T073020Z-normal-warm-c20-stable,5,0,0,5,True,success
+stable,no-cancel,cold,1,results/e24/formal-20261004T072126Z/stable/e24-20261004T072259Z-no-cancel-cold-c1-stable,5,0,0,5,True,success
+stable,no-cancel,cold,5,results/e24/formal-20261004T072126Z/stable/e24-20261004T072341Z-no-cancel-cold-c5-stable,5,0,0,5,True,success
+stable,no-cancel,cold,20,results/e24/formal-20261004T072126Z/stable/e24-20261004T072554Z-no-cancel-cold-c20-stable,5,0,0,5,True,success
+stable,no-cancel,warm,1,results/e24/formal-20261004T072126Z/stable/e24-20261004T072640Z-no-cancel-warm-c1-stable,5,0,0,5,True,success
+stable,no-cancel,warm,5,results/e24/formal-20261004T072126Z/stable/e24-20261004T072851Z-no-cancel-warm-c5-stable,5,0,0,5,True,success
+stable,no-cancel,warm,20,results/e24/formal-20261004T072126Z/stable/e24-20261004T072935Z-no-cancel-warm-c20-stable,5,0,0,5,True,success

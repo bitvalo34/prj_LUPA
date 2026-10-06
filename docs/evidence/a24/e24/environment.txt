@@ -1,0 +1,109 @@
+===== E24 identity =====
+capturedAt=2026-10-04T01:21:26-06:00
+timezone=CST
+repo=/home/erwin/PRJIMA
+commit=c9c7f0a19095d635486d52c0e2f8ab78d3e3e25b
+branch=feature/e24-performance-campaign
+remote=https://github.com/bitvalo34/prj_LUPA
+workingTreeDirty=true
+## feature/e24-performance-campaign...origin/feature/e24-performance-campaign
+?? .venv/
+?? drr-real-browser-evidence.txt
+?? src/main/resources/web/assets/app-E9QJGLo1.js
+===== Kernel / WSL =====
+Linux LAPTOP-DNG8RJ0O 6.18.33.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun 18 21:54:43 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+Linux version 6.18.33.2-microsoft-standard-WSL2 (root@f1bbfb02316b) (gcc (GCC) 13.2.0, GNU ld (GNU Binutils) 2.41) #1 SMP PREEMPT_DYNAMIC Thu Jun 18 21:54:43 UTC 2026
+PRETTY_NAME="Ubuntu 24.04.3 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.3 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=noble
+LOGO=ubuntu-logo
+detectedWSL=true
+===== CPU =====
+nproc=32
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           48 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  32
+On-line CPU(s) list:                     0-31
+Vendor ID:                               AuthenticAMD
+Model name:                              AMD Ryzen 9 8940HX with Radeon Graphics
+CPU family:                              25
+Model:                                   97
+Thread(s) per core:                      2
+Core(s) per socket:                      16
+Socket(s):                               1
+Stepping:                                2
+BogoMIPS:                                4790.92
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext perfctr_core ssbd ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx512_bf16 clzero xsaveerptr arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm
+Virtualization:                          AMD-V
+Hypervisor vendor:                       Microsoft
+Virtualization type:                     full
+L1d cache:                               512 KiB (16 instances)
+L1i cache:                               512 KiB (16 instances)
+L2 cache:                                16 MiB (16 instances)
+L3 cache:                                32 MiB (1 instance)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-31
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Ghostwrite:                Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Old microcode:             Not affected
+Vulnerability Reg file data sampling:    Not affected
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Vulnerable: Safe RET, no microcode
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP always-on; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Mitigation; Clear CPU buffers
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Not affected
+===== Memory =====
+               total        used        free      shared  buff/cache   available
+Mem:     16261009408  1842622464   543158272    51838976 14178041856 14418386944
+Swap:     4294967296    26214400  4268752896
+MemTotal:       15879892 kB
+MemAvailable:   14080068 kB
+SwapTotal:       4194304 kB
+SwapFree:        4168704 kB
+===== Storage =====
+TARGET SOURCE   FSTYPE OPTIONS
+/      /dev/sdf ext4   rw,relatime,discard,errors=remount-ro,data=ordered
+Filesystem     Type  1K-blocks      Used Available Use% Mounted on
+/dev/sdf       ext4 1055762868 135988740 866070656  14% /
+===== Java =====
+openjdk version "21.0.12" 2026-07-21 LTS
+OpenJDK Runtime Environment Temurin-21.0.12+8 (build 21.0.12+8-LTS)
+OpenJDK 64-Bit Server VM Temurin-21.0.12+8 (build 21.0.12+8-LTS, mixed mode, sharing)
+VM settings:
+    Max. Heap Size (Estimated): 3.79G
+    Using VM: OpenJDK 64-Bit Server VM
+
+openjdk version "21.0.12" 2026-07-21 LTS
+OpenJDK Runtime Environment Temurin-21.0.12+8 (build 21.0.12+8-LTS)
+OpenJDK 64-Bit Server VM Temurin-21.0.12+8 (build 21.0.12+8-LTS, mixed mode, sharing)
+===== Maven =====
+Apache Maven 3.9.16 (2bdd9fddda4b155ebf8000e807eb73fd829a51d5)
+Maven home: /home/erwin/.sdkman/candidates/maven/current
+Java version: 21.0.12, vendor: Eclipse Adoptium, runtime: /home/erwin/.sdkman/candidates/java/21.0.12-tem
+Default locale: en, platform encoding: UTF-8
+OS name: "linux", version: "6.18.33.2-microsoft-standard-wsl2", arch: "amd64", family: "unix"
+===== Tools =====
+Python 3.12.12
+v24.16.0
+11.16.0

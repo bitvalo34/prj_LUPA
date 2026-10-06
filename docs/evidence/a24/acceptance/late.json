@@ -1,0 +1,56 @@
+{
+  "mode": "late",
+  "seed": 23001717,
+  "startedAt": "2026-10-06T17:23:45.726Z",
+  "finishedAt": "2026-10-06T17:23:56.809Z",
+  "status": "PASS",
+  "checks": {
+    "lateDecodeDiscarded": true,
+    "noStaleCanvasDraw": true,
+    "noImageMix": true,
+    "noExternalRequests": true,
+    "bitmapBudgetBounded": true,
+    "decodePipelineBounded": true
+  },
+  "summary": {
+    "interactions": 0,
+    "detailCycles": 0,
+    "wsViews": 4,
+    "receivedTiles": 46,
+    "drawnTiles": 36,
+    "discardedTiles": 10,
+    "failedTiles": 0,
+    "releases": 46,
+    "peakLiveBitmapBytes": 3628856,
+    "peakLiveBitmaps": 21,
+    "peakPendingDecodeJobs": 16,
+    "staleDrawViolations": 0,
+    "imageMixViolations": 0,
+    "externalRequests": 0,
+    "finalPhase": "observing",
+    "finalImage": "demo-auxiliar",
+    "finalVersion": "v1"
+  },
+  "samples": [
+    {
+      "label": "initial",
+      "phase": "observing",
+      "connection": 1,
+      "epoch": 2,
+      "mode": "Uniforme",
+      "detail": "0",
+      "zoom": "1.00×",
+      "received": 21,
+      "drawn": 21,
+      "discarded": 0,
+      "failed": 0,
+      "releases": 21,
+      "managedMiB": 3.5,
+      "planLevel": 3,
+      "image": "demo-auxiliar",
+      "version": "v1",
+      "canvasHash": "ae780c81"
+    }
+  ],
+  "failures": []
+}

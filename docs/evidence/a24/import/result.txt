@@ -1,0 +1,1 @@
+PASS valid import; invalid exit=3; catalog unchanged; original unchanged
